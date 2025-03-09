@@ -18,3 +18,6 @@ target_link_libraries(test_duplicate ${PROJECT_NAME})
 
 add_executable(test_dhnsw test_dhnsw.cpp)
 target_link_libraries(test_dhnsw ${PROJECT_NAME})
+
+add_executable(fgim_exp fgim_exp.cpp)
+target_link_libraries(fgim_exp ${PROJECT_NAME})

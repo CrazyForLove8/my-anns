@@ -12,22 +12,21 @@ using namespace hnsw;
 namespace dhnsw {
 
     class DHNSW : public HNSW {
+    private:
+        float lambda_;
 
     public:
-        DHNSW(int max_neighbors,
-              int ef_construction);
+        DHNSW(DatasetPtr &dataset,
+              int max_neighbors,
+              int ef_construction,
+              float lambda);
 
-        HNSWGraph build(IndexOracle &oracle) override;
-
-        Neighbors HNSW_search(HNSWGraph &hnsw_graph,
-                              IndexOracle &oracle,
-                              float *query,
-                              int topk,
-                              int ef_search) const override;
-
+        Neighbors
+        search(const float *query,
+               unsigned int topk,
+               unsigned int L) const override;
     };
 
+}  // namespace dhnsw
 
-}
-
-#endif //MYANNS_DHNSW_H
+#endif  // MYANNS_DHNSW_H

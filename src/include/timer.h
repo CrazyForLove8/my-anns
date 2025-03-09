@@ -6,25 +6,29 @@
 #define MYANNS_TIMER_H
 
 #include <chrono>
-#include <string>
 #include <stdexcept>
+#include <string>
 
-namespace graph{
-    class Timer {
-    private:
-        std::chrono::time_point<std::chrono::steady_clock> _start, _end;
-        bool started;
-    public:
-        Timer();
+namespace graph {
+class Timer {
+private:
+    std::chrono::time_point<std::chrono::steady_clock> _start, _end;
+    bool started;
 
-        ~Timer() = default;
+public:
+    Timer();
 
-        void start();
+    ~Timer() = default;
 
-        void end();
+    void
+    start();
 
-        [[nodiscard]] double elapsed() const;
-    };
-}
+    void
+    end();
 
-#endif //MYANNS_TIMER_H
+    [[nodiscard]] double
+    elapsed() const;
+};
+}  // namespace graph
+
+#endif  // MYANNS_TIMER_H

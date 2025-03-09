@@ -1,30 +1,30 @@
-#include "nndescent.h"
-#include "vamana.h"
-#include "taumng.h"
-#include "nsw.h"
+#include "evaluator.h"
 #include "fgim.h"
-#include "utils.h"
+#include "nndescent.h"
+#include "nsw.h"
+#include "taumng.h"
+#include "vamana.h"
 
 using namespace graph;
 
-std::pair<Graph, Graph> subgraph_nnd(IndexOracle &oracle_half1,
-                  IndexOracle &oracle_half2) {
+std::pair<Graph, Graph>
+subgraph_nnd(IndexOracle<float>& oracle_half1, IndexOracle<float>& oracle_half2) {
     nndescent::NNDescent nndescent(20);
     auto graph_half_1 = nndescent.build(oracle_half1);
     auto graph_half_2 = nndescent.build(oracle_half2);
     return std::make_pair(graph_half_1, graph_half_2);
 }
 
-std::pair<Graph, Graph> subgraph_vamana(IndexOracle &oracle_half1,
-                                     IndexOracle &oracle_half2) {
+std::pair<Graph, Graph>
+subgraph_vamana(IndexOracle<float>& oracle_half1, IndexOracle<float>& oracle_half2) {
     diskann::Vamana vamana(1.2, 100, 80);
     auto graph_half_1 = vamana.build(oracle_half1);
     auto graph_half_2 = vamana.build(oracle_half2);
     return std::make_pair(graph_half_1, graph_half_2);
 }
 
-std::pair<Graph, Graph> subgraph_taumng(IndexOracle &oracle_half1,
-                                     IndexOracle &oracle_half2) {
+std::pair<Graph, Graph>
+subgraph_taumng(IndexOracle<float>& oracle_half1, IndexOracle<float>& oracle_half2) {
     nndescent::NNDescent nndescent(20);
     auto graph_half_1 = nndescent.build(oracle_half1);
     auto graph_half_2 = nndescent.build(oracle_half2);
@@ -36,40 +36,41 @@ std::pair<Graph, Graph> subgraph_taumng(IndexOracle &oracle_half1,
     return std::make_pair(graph_half_1, graph_half_2);
 }
 
-std::pair<Graph, Graph> subgraph_nsw(IndexOracle &oracle_half1,
-                                     IndexOracle &oracle_half2) {
+std::pair<Graph, Graph>
+subgraph_nsw(IndexOracle<float>& oracle_half1, IndexOracle<float>& oracle_half2) {
     nsw::NSW nsw(32, 100);
     auto graph_half_1 = nsw.build(oracle_half1);
     auto graph_half_2 = nsw.build(oracle_half2);
     return std::make_pair(graph_half_1, graph_half_2);
 }
 
-void test_fgim(Matrix &base,
-                    const Matrix &query,
-                    const std::vector<std::vector<unsigned int>> &groundTruth,
-                    unsigned int K,
-                    unsigned int M0 = 20,
-                    unsigned int L = 20,
-                    unsigned int M = 80) {
-    Matrix base_half;
+void
+test_fgim(Matrix<float>& base,
+          const Matrix<float>& query,
+          const std::vector<std::vector<unsigned int>>& groundTruth,
+          unsigned int K,
+          unsigned int M0 = 20,
+          unsigned int L = 20,
+          unsigned int M = 80) {
+    Matrix<float> base_half;
     base.halve(base_half);
-    MatrixOracle<metric::l2> oracle_half1(base);
-    MatrixOracle<metric::l2> oracle_half2(base_half);
+    MatrixOracle<float, metric::l2> oracle_half1(base);
+    MatrixOracle<float, metric::l2> oracle_half2(base_half);
 
     std::cout << "Preparing subgraphs (2 parts)" << std::endl;
     /**
-     * Change the algorithm to the one you want to test
-     * nndescent: subgraph_nnd
-     * vamana: subgraph_vamana
-     * taumng: subgraph_taumng
-     * nsw: subgraph_nsw
-     */
+   * Change the algorithm to the one you want to test
+   * nndescent: subgraph_nnd
+   * vamana: subgraph_vamana
+   * taumng: subgraph_taumng
+   * nsw: subgraph_nsw
+   */
     auto [graph_half_1, graph_half_2] = subgraph_nnd(oracle_half1, oracle_half2);
 
-    Matrix merged;
+    Matrix<float> merged;
     mergeMatrix(base, base_half, merged);
 
-    MatrixOracle<metric::l2> oracle_merged(merged);
+    MatrixOracle<float, metric::l2> oracle_merged(merged);
 
     std::cout << "Merging subgraphs" << std::endl;
 
@@ -79,7 +80,8 @@ void test_fgim(Matrix &base,
     evaluate(graph, K, query, groundTruth, oracle_merged);
 }
 
-int main(int argc, char **argv) {
+int
+main(int argc, char** argv) {
     // set verbose to true if you want to see more information
     Log::setVerbose(false);
     // Recall@K
@@ -91,17 +93,17 @@ int main(int argc, char **argv) {
     std::string groundtruth_path = "../../datasets/sift/sift_groundtruth.ivecs";
 
     // Load the dataset and groundtruth
-    Matrix base;
+    Matrix<float> base;
     base.load(base_path);
-    Matrix query;
+    Matrix<float> query;
     query.load(query_path);
-    MatrixOracle<metric::l2> oracle(base);
+    MatrixOracle<float, metric::l2> oracle(base);
     auto groundTruth = loadGroundTruth(groundtruth_path, query.size());
 
     // Test FGIM
-    if(argc == 1){
+    if (argc == 1) {
         test_fgim(base, query, groundTruth, K);
-    }else{
+    } else {
         auto M0 = (unsigned)strtol(argv[1], nullptr, 10);
         auto L = (unsigned)strtol(argv[2], nullptr, 10);
         auto M = (unsigned)strtol(argv[3], nullptr, 10);

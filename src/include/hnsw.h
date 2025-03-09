@@ -5,28 +5,28 @@
 #ifndef MYANNS_HNSW_H
 #define MYANNS_HNSW_H
 
-#include <random>
 #include <omp.h>
+#include <random>
 #include <unordered_set>
-#include "graph.h"
-#include "dtype.h"
-#include "metric.h"
-#include "logger.h"
-#include "timer.h"
-
-using namespace graph;
+#include "index.h"
 
 namespace hnsw {
 
-    using HNSWGraph = std::vector<Graph>;
-
-    class HNSW {
+    class HNSW : public Index {
     protected:
-        int max_neighbors_;
+        HGraph graph_;
 
-        int ef_construction_;
+        FlattenHGraph flatten_graph_;
 
-        unsigned enter_point_;
+        uint32_t max_neighbors_;
+
+        uint32_t max_base_neighbors_;
+
+        uint32_t max_level_;
+
+        uint32_t ef_construction_;
+
+        uint32_t enter_point_;
 
         double reverse_;
 
@@ -34,53 +34,80 @@ namespace hnsw {
 
         std::default_random_engine random_engine_;
 
-        virtual void addPoint(HNSWGraph &hnsw_graph,
-                              IndexOracle &oracle,
-                              unsigned index);
+        virtual void
+        addPoint(unsigned index);
+
+        Neighbors
+        searchLayer(
+                const Graph &graph,
+                const float *query,
+                size_t topk,
+                size_t L,
+                size_t entry_id) const;
 
         /**
-         * This implementation follows the original paper.
-         * @param graph
-         * @param oracle
-         * @param query
-         * @param enter_point
-         * @param ef
-         * @return
-         */
-        Neighbors searchLayer(Graph &graph,
-                              IndexOracle &oracle,
-                              float *query,
-                              int enter_point,
-                              int ef);
+                       * This implementation follows the original paper.
+                       * @param graph
+                       * @param oracle
+                       * @param query
+                       * @param enter_point
+                       * @param ef
+                       * @return
+                       */
+        Neighbors
+        searchLayer(Graph &graph,
+                    IndexOracle<float> &oracle,
+                    float *query,
+                    int enter_point,
+                    int ef);
 
-        int seekPos(const Neighbors &vec);
+        static int
+        seekPos(const Neighbors &vec);
 
+        void
+        prune(Neighbors &candidates,
+              int max_neighbors);
 
-        Neighbors prune(IndexOracle &oracle,
-                        Neighbors &candidates);
+        void
+        build_internal() override;
 
     public:
-        HNSW(int max_neighbors,
+        HNSW(DatasetPtr &dataset,
+             int max_neighbors,
              int ef_construction);
 
-        void set_max_neighbors(int max_neighbors) {
-            this->max_neighbors_ = max_neighbors;
-        }
+        ~HNSW() override = default;
 
-        void set_ef_construction(int ef_construction) {
-            this->ef_construction_ = ef_construction;
-        }
+        void
+        set_max_neighbors(int max_neighbors);
 
-        void reset();
+        void
+        set_ef_construction(int ef_construction);
 
-        virtual HNSWGraph build(IndexOracle &oracle);
+        void
+        build() override;
 
-        virtual Neighbors HNSW_search(HNSWGraph &hnsw_graph,
-                                      IndexOracle &oracle,
-                                      float *query,
-                                      int topk,
-                                      int ef_search) const;
+        Graph &
+        extractGraph() override;
+
+        HGraph &
+        extractHGraph();
+
+        void
+        add(DatasetPtr &dataset) override;
+
+        Neighbors
+        search(const float *query,
+               unsigned int topk,
+               unsigned int L) const override;
+
+        //        virtual Neighbors
+        //        HNSW_search(HGraph &hnsw_graph,
+        //                    IndexOracle<float> &oracle,
+        //                    float *query,
+        //                    int topk,
+        //                    int ef_search) const;
     };
-}
+}  // namespace hnsw
 
-#endif //MYANNS_HNSW_H
+#endif  // MYANNS_HNSW_H

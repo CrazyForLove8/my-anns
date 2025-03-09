@@ -5,54 +5,56 @@
 #ifndef MYANNS_NSG_H
 #define MYANNS_NSG_H
 
-#include <random>
 #include <omp.h>
-#include "graph.h"
-#include "dtype.h"
-#include "metric.h"
-#include "logger.h"
-#include "timer.h"
+
+#include <random>
+
+#include "index.h"
 
 using namespace graph;
 
 namespace nsg {
-    class NSG {
+    class NSG : public Index {
     private:
         int root{};
 
         /**
-         * search pool size
-         */
+                   * search pool size
+                   */
         unsigned L_;
 
         /**
-         * maximum number of neighbors
-         */
+                   * maximum number of neighbors
+                   */
         unsigned m_;
-    public:
-        NSG(unsigned m,
-            unsigned L) : m_(m), L_(L) {}
 
-        void set_L(unsigned L) {
+        void
+        build_internal() override;
+
+    public:
+        NSG(DatasetPtr &dataset,
+            unsigned L,
+            unsigned m);
+
+        ~NSG() override = default;
+
+        void
+        set_L(unsigned L) {
             this->L_ = L;
         }
 
-        void set_m(unsigned m) {
+        void
+        set_m(unsigned m) {
             this->m_ = m;
         }
 
-        void build(Graph &graph,
-                   IndexOracle &oracle);
+        Neighbors
+        prune(std::vector<Neighbor> &candidates);
 
-        std::vector<Neighbor> prune(IndexOracle &oracle,
-                                    std::vector<Neighbor> &candidates);
-
-        void tree(Graph &graph,
-                  IndexOracle &oracle,
-                  int root);
+        void
+        tree();
     };
 
+}  // namespace nsg
 
-}
-
-#endif //MYANNS_NSG_H
+#endif  // MYANNS_NSG_H

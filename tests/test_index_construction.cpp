@@ -1,58 +1,73 @@
+#include "evaluator.h"
 #include "nndescent.h"
-#include "vamana.h"
-#include "taumng.h"
 #include "nsw.h"
-#include "utils.h"
+#include "taumng.h"
+#include "vamana.h"
 
-void test_nndescent(IndexOracle &oracle,
-                    const Matrix &query,
-                    const std::vector<std::vector<unsigned int>> &groundTruth,
-                    unsigned int K) {
-    nndescent::NNDescent nndescent(20);
+void
+test_nndescent(OraclePtr& oracle,
+               const Matrix<float>& query,
+               const std::vector<std::vector<unsigned int>>& groundTruth,
+               unsigned int K) {
+    nndescent::NNDescent nndescent(oracle, 20);
 
-    auto graph = nndescent.build(oracle);
+    nndescent.build();
 
-    evaluate(graph, K, query, groundTruth, oracle);
+    auto graph = nndescent.extractGraph();
+
+    evaluate(graph, K, query, groundTruth, oracle.get());
 }
 
-void test_vamana(IndexOracle &oracle,
-                 const Matrix &query,
-                 const std::vector<std::vector<unsigned int>> &groundTruth,
-                 unsigned int K) {
-    diskann::Vamana vamana(1.2, 100, 80);
+void
+test_vamana(OraclePtr& oracle,
+            const Matrix<float>& query,
+            const std::vector<std::vector<unsigned int>>& groundTruth,
+            unsigned int K) {
+    diskann::Vamana vamana(oracle, 1.2, 100, 80);
 
-    auto graph = vamana.build(oracle);
+    vamana.build();
 
-    evaluate(graph, K, query, groundTruth, oracle);
+    auto graph = vamana.extractGraph();
+
+    evaluate(graph, K, query, groundTruth, oracle.get());
 }
 
-void test_taumng(IndexOracle &oracle,
-                 const Matrix &query,
-                 const std::vector<std::vector<unsigned int>> &groundTruth,
-                 unsigned int K) {
-    nndescent::NNDescent nndescent(20);
+void
+test_taumng(OraclePtr& oracle,
+            const Matrix<float>& query,
+            const std::vector<std::vector<unsigned int>>& groundTruth,
+            unsigned int K) {
+    nndescent::NNDescent nndescent(oracle, 20);
 
-    auto graph = nndescent.build(oracle);
+    nndescent.build();
 
-    taumng::TauMNG taumng(10, 80, 100);
+    auto graph = nndescent.extractGraph();
 
-    taumng.build(graph, oracle);
+    taumng::TauMNG taumng(oracle, graph, 10, 80, 100);
 
-    evaluate(graph, K, query, groundTruth, oracle);
+    taumng.build();
+
+    graph = taumng.extractGraph();
+
+    evaluate(graph, K, query, groundTruth, oracle.get());
 }
 
-void test_nsw(IndexOracle &oracle,
-              const Matrix &query,
-              const std::vector<std::vector<unsigned int>> &groundTruth,
-              unsigned int K) {
-    nsw::NSW nsw(32, 100);
+void
+test_nsw(OraclePtr& oracle,
+         const Matrix<float>& query,
+         const std::vector<std::vector<unsigned int>>& groundTruth,
+         unsigned int K) {
+    nsw::NSW nsw(oracle, 32, 100);
 
-    auto graph = nsw.build(oracle);
+    nsw.build();
 
-    evaluate(graph, K, query, groundTruth, oracle);
+    auto graph = nsw.extractGraph();
+
+    evaluate(graph, K, query, groundTruth, oracle.get());
 }
 
-int main(int argc, char **argv) {
+int
+main(int argc, char** argv) {
     // set verbose to true if you want to see more information
     Log::setVerbose(false);
 
@@ -70,11 +85,11 @@ int main(int argc, char **argv) {
     std::string groundtruth_path = "../../datasets/sift/sift_groundtruth.ivecs";
 
     // Load the dataset and groundtruth
-    Matrix base;
+    Matrix<float> base;
     base.load(base_path);
-    Matrix query;
+    Matrix<float> query;
     query.load(query_path);
-    MatrixOracle<metric::l2> oracle(base);
+    auto oracle = MatrixOracle<float, metric::l2>::getInstance(base);
     auto groundTruth = loadGroundTruth(groundtruth_path, query.size());
 
     if (std::string(argv[1]) == "nndescent") {

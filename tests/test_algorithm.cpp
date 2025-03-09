@@ -1,21 +1,22 @@
+#include "evaluator.h"
 #include "hnsw.h"
-#include "utils.h"
 #include "timer.h"
 
 using namespace graph;
 
-int main() {
-    hnsw::HNSW hnsw(8, 200);
-
+int
+main() {
+    std::string noise = "1_3_001";
+    //    Log::redirect("hnsw");
     Log::setVerbose(true);
     int K = 10;
 
     /**
-     * 0: sift 10k
-     * 1: sift 1m
-     * 2: perturbed sift 10k 10k+30k
-     */
-    int dataset = 2;
+   * 0: sift 10k
+   * 1: sift 1m
+   * 2: perturbed sift 10k 10k+30k
+   */
+    int dataset = 3;
 
     std::string base_path, query_path, groundtruth_path;
 
@@ -35,20 +36,26 @@ int main() {
             query_path = "../../datasets/siftsmall/siftsmall_query.fvecs";
             groundtruth_path = "../../datasets/siftsmall/siftsmall_groundtruth.ivecs";
             break;
+        case 3:
+            base_path = "/root/datasets/sift_perturbed/10k/sift_base_" + noise + ".fvecs";
+            query_path = "/root/datasets/sift/10k/sift_query.fvecs";
+            groundtruth_path = "/root/datasets/sift/10k/sift_groundtruth.ivecs";
+            break;
         default:
             std::cerr << "Unknown dataset" << std::endl;
             return 0;
     }
 
-
-    Matrix base;
+    Matrix<float> base;
     base.load(base_path);
-    Matrix query;
+    Matrix<float> query;
     query.load(query_path);
-    MatrixOracle<metric::l2> oracle(base);
+    auto oracle = MatrixOracle<float, metric::l2>::getInstance(base);
     auto groundTruth = loadGroundTruth(groundtruth_path, query.size());
 
-    auto graph = hnsw.build(oracle);
+    hnsw::HNSW hnsw(oracle, 8, 200);
+    hnsw.build();
+    auto graph = hnsw.extractHGraph();
 
     for (int level = 0; level < graph.size(); level++) {
         int cnt = 0;
@@ -87,13 +94,14 @@ int main() {
     std::unordered_map<int, int> duplicate_map;
     int current_cluster_id = 0;
 
-    for (int i = 0; i < oracle.size(); ++i) {
-        if (duplicate_map.count(i)) continue;
+    for (int i = 0; i < oracle->size(); ++i) {
+        if (duplicate_map.count(i))
+            continue;
 
         duplicate_map[i] = current_cluster_id;
 
-        for (int j = i + 1; j < oracle.size(); ++j) {
-            if (oracle(i, j) < 1) {
+        for (int j = i + 1; j < oracle->size(); ++j) {
+            if ((*oracle)(i, j) < 1) {
                 duplicate_map[j] = current_cluster_id;
             }
         }
@@ -109,23 +117,23 @@ int main() {
 
     std::unordered_set<int> seen_clusters;
 
-    std::vector<unsigned>
-            search_Ls = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+    std::vector<unsigned> search_Ls = {
+            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
     size_t qsize = query.size();
     for (auto L: search_Ls) {
         float recall = 0;
         double qps = 0;
-//        float ilad = 0, ilmd = std::numeric_limits<float>::max();
+        //        float ilad = 0, ilmd = std::numeric_limits<float>::max();
         auto runs = 5;
         for (int x = 0; x < runs; ++x) {
             Timer timer;
             timer.start();
             float local_recall = 0;
-//            float local_ilad = 0;
-//            float local_ilmd = std::numeric_limits<float>::max();
-//#pragma omp parallel for reduction(+:local_recall)
+            //            float local_ilad = 0;
+            //            float local_ilmd = std::numeric_limits<float>::max();
+            //#pragma omp parallel for reduction(+:local_recall)
             for (size_t i = 0; i < qsize; ++i) {
-                auto result = hnsw.HNSW_search(graph, oracle, query[i], K, L);
+                auto result = hnsw.search(query[i], K, L);
                 if (result.size() != K) {
                     std::cerr << "Result size is not K" << std::endl;
                     return 0;
@@ -147,24 +155,24 @@ int main() {
                     seen_clusters.insert(cluster_id);
                 }
 
-//                for (int x = 0; x < result.size(); ++x) {
-//                    for (int y = x + 1; y < result.size(); ++y) {
-//                        auto dist = oracle(result[x].id, result[y].id);
-//                        local_ilad += dist;
-//                        local_ilmd = std::min(local_ilmd, dist);
-//                    }
-//                }
+                //                for (int x = 0; x < result.size(); ++x) {
+                //                    for (int y = x + 1; y < result.size(); ++y) {
+                //                        auto dist = oracle(result[x].id,
+                //                        result[y].id); local_ilad += dist; local_ilmd
+                //                        = std::min(local_ilmd, dist);
+                //                    }
+                //                }
                 local_recall += static_cast<float>(correct);
                 seen_clusters.clear();
             }
             timer.end();
-//            ilad = std::max(ilad, local_ilad / (qsize * K * (K - 1) / 2));
-//            ilmd = std::min(ilmd, local_ilmd);
+            //            ilad = std::max(ilad, local_ilad / (qsize * K * (K - 1) /
+            //            2)); ilmd = std::min(ilmd, local_ilmd);
             qps = std::max(qps, (double) qsize / timer.elapsed());
             recall = std::max(local_recall / (static_cast<float>(qsize * K)), recall);
         }
         std::cout << "L: " << L << " recall: " << recall << " qps: " << qps << std::endl;
-//        std::cout << "L: " << L << " ilad: " << ilad << " ilmd: " << ilmd << std::endl;
+        //        std::cout << "L: " << L << " ilad: " << ilad << " ilmd: " << ilmd
+        //        << std::endl;
     }
-
 }

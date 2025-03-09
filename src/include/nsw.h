@@ -5,48 +5,50 @@
 #ifndef MYANNS_NSW_H
 #define MYANNS_NSW_H
 
-#include <random>
 #include <omp.h>
-#include "graph.h"
-#include "dtype.h"
-#include "metric.h"
-#include "logger.h"
-#include "timer.h"
 
-using namespace graph;
+#include <random>
+
+#include "index.h"
 
 namespace nsw {
-class NSW {
+    class NSW : public Index {
     private:
         int max_neighbors_;
 
         int ef_construction_;
 
-        void addPoint(Graph &graph,
-                      IndexOracle &oracle,
-                      unsigned index);
+        void
+        addPoint(unsigned index);
 
-        Neighbors multisearch(const Graph &graph,
-                                          const IndexOracle &oracle,
-                                          unsigned query,
-                                          int attempts,
-                                          int k);
+        Neighbors
+        multisearch(
+                const Graph &graph,
+                const IndexOracle<float> &oracle,
+                unsigned query,
+                int attempts,
+                int k);
+
+        void
+        build_internal() override;
 
     public:
-        NSW(int max_neighbors,
-            int ef_construction) : max_neighbors_(max_neighbors),
-                                   ef_construction_(ef_construction) {}
+        NSW(DatasetPtr &dataset,
+            int max_neighbors,
+            int ef_construction);
 
-        void set_max_neighbors(int max_neighbors) {
+        ~NSW() override = default;
+
+        void
+        set_max_neighbors(int max_neighbors) {
             this->max_neighbors_ = max_neighbors;
         }
 
-        void set_ef_construction(int ef_construction) {
+        void
+        set_ef_construction(int ef_construction) {
             this->ef_construction_ = ef_construction;
         }
-
-        Graph build(IndexOracle &oracle);
     };
-}
+}  // namespace nsw
 
-#endif //MYANNS_NSW_H
+#endif  // MYANNS_NSW_H

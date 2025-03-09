@@ -5,61 +5,77 @@
 #ifndef MYANNS_MERGE_H
 #define MYANNS_MERGE_H
 
-#include "graph.h"
 #include "dtype.h"
+#include "graph.h"
 #include "logger.h"
 #include "timer.h"
+#include "dataset.h"
+#include "index.h"
+#include "hnsw.h"
 
-namespace graph {
+class FGIM : public Index {
+protected:
+    unsigned max_degree_;
 
-    class FGIM {
-    private:
-        unsigned M0_{20};
+    float sample_rate_;
 
-        unsigned M_{80};
+//        void
+//        Sampling(Graph &graph,
+//                 const Graph &g1,
+//                 const Graph &g2,
+//                 OraclePtr &oracle1,
+//                 OraclePtr &oracle2,
+//                 OraclePtr &oracle);
+    virtual void
+    CrossQuery(std::vector<IndexPtr> &indexes);
 
-        unsigned L_{20};
+    virtual void
+    Refinement();
 
-        void Sampling(Graph &graph,
-                      const Graph &g1,
-                      const Graph &g2,
-                      IndexOracle &oracle1,
-                      IndexOracle &oracle2,
-                      IndexOracle &oracle);
+    void
+    update_neighbors(Graph &graph);
 
-        void Refinement(Graph &graph,
-                        IndexOracle &oracle);
+    void
+    prune(Graph &graph);
 
-    public:
-        static constexpr unsigned ITER_MAX = 100;
+    void
+    add_reverse_edge(Graph &graph);
 
-        static constexpr unsigned SAMPLES = 100;
+    void
+    connect_no_indegree(Graph &graph);
 
-        static constexpr float THRESHOLD = 0.001;
+public:
+    static constexpr unsigned ITER_MAX = 100;
 
-        FGIM() = default;
+    static constexpr unsigned SAMPLES = 100;
 
-        explicit FGIM(unsigned M0, unsigned M, unsigned L);
+    static constexpr float THRESHOLD = 0.001;
 
-        ~FGIM() = default;
+    FGIM();
 
-        /**
-         * @brief FGIM two PGs
-         * @param g1  The first graph
-         * @param oracle1 The distance oracle of the first graph
-         * @param g2  The second nearest neighbor graph
-         * @param oracle2 The distance oracle of the second graph
-         * @param oracle The distance oracle
-         * @return The merged graph
-         */
-        Graph merge(const Graph &g1,
-                    IndexOracle &oracle1,
-                    const Graph &g2,
-                    IndexOracle &oracle2,
-                    IndexOracle &oracle);
+    explicit FGIM(unsigned max_degree,
+                  float sample_rate = 0.3);
 
-    };
+    ~FGIM() override = default;
 
-}
+//        /**
+//               * @brief FGIM two PGs
+//               * @param g1  The first graph
+//               * @param oracle1 The distance oracle of the first graph
+//               * @param g2  The second nearest neighbor graph
+//               * @param oracle2 The distance oracle of the second graph
+//               * @param oracle The distance oracle
+//               * @return The merged graph
+//               */
+//        Graph
+//        merge(const Graph &g1,
+//              OraclePtr &oracle1,
+//              const Graph &g2,
+//              OraclePtr &oracle2,
+//              OraclePtr &oracle);
 
-#endif //MYANNS_MERGE_H
+    virtual void
+    Combine(std::vector<IndexPtr> &indexes);
+};
+
+#endif  // MYANNS_MERGE_H

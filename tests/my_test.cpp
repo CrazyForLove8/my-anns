@@ -8,11 +8,13 @@
 std::uniform_real_distribution<double> distribution(0.0, 1.0);
 std::default_random_engine random_engine_(2024);
 
-double get_random(){
+double
+get_random() {
     return -log(distribution(random_engine_)) * 1 / log(1.0 * 10);
 }
 
-int main(){
+int
+main() {
     double r = get_random();
     std::cout << r << std::endl;
 

@@ -5,19 +5,15 @@
 #ifndef MYANNS_NNDESCENT_H
 #define MYANNS_NNDESCENT_H
 
-#include <random>
 #include <omp.h>
-#include "graph.h"
-#include "dtype.h"
-#include "metric.h"
-#include "logger.h"
-#include "timer.h"
 
-using namespace graph;
+#include <random>
+
+#include "index.h"
 
 namespace nndescent {
 
-class NNDescent {
+    class NNDescent : public Index {
     private:
         unsigned K_{64};
 
@@ -27,27 +23,30 @@ class NNDescent {
 
         unsigned iteration_{100};
 
-        void initializeGraph(Graph &graph,
-                             IndexOracle &oracle);
+        void
+        initializeGraph();
 
-        void generateUpdate(Graph &graph);
+        void
+        generateUpdate();
 
-        int applyUpdate(unsigned sample,
-                        Graph &graph,
-                        IndexOracle &oracle);
+        int
+        applyUpdate(unsigned sample);
 
-        void clearGraph(Graph &graph);
+        void
+        clearGraph();
+
+        void
+        build_internal() override;
 
     public:
-        NNDescent() = default;
+        NNDescent(DatasetPtr &dataset,
+                  int K,
+                  float rho = 0.5,
+                  float delta = 0.001,
+                  int iteration = 20);
 
-        explicit NNDescent(int K, float rho=0.5, float delta=0.001, int iteration=20)
-                : K_(K), rho_(rho), delta_(delta), iteration_(iteration) {}
-
-        ~NNDescent() = default;
-
-        Graph build(IndexOracle &oracle);
+        ~NNDescent() override = default;
     };
-}
+}  // namespace nndescent
 
-#endif //MYANNS_NNDESCENT_H
+#endif  // MYANNS_NNDESCENT_H

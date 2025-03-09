@@ -5,54 +5,56 @@
 #ifndef MYANNS_VAMANA_H
 #define MYANNS_VAMANA_H
 
-#include <random>
 #include <omp.h>
-#include "graph.h"
-#include "dtype.h"
-#include "metric.h"
-#include "logger.h"
-#include "timer.h"
 
-using namespace graph;
+#include <random>
+
+#include "index.h"
 
 namespace diskann {
-class Vamana {
+    class Vamana : public Index {
     private:
         /**
-         * alpha
-         */
+                   * alpha
+                   */
         float alpha_;
 
         /*
-         * HNSW_search pool size
-         */
+                   * HNSW_search pool size
+                   */
         int L_;
 
         /**
-         * maximum number of neighbors
-         */
+                   * maximum number of neighbors
+                   */
         int R_;
 
-        void RobustPrune(Graph &graph,
-                         IndexOracle &oracle,
-                         float alpha,
-                         int point,
-                         Neighbors &candidates);
+        void
+        RobustPrune(float alpha,
+                    int point,
+                    Neighbors &candidates);
+
+        void
+        build_internal() override;
 
     public:
-        Vamana(float alpha,
+        Vamana(DatasetPtr &dataset,
+               float alpha,
                int L,
                int R);
 
-        void set_alpha(float alpha);
+        ~Vamana() override = default;
 
-        void set_L(int L);
+        void
+        set_alpha(float alpha);
 
-        void set_R(int R);
+        void
+        set_L(int L);
 
-        Graph build(IndexOracle &oracle);
+        void
+        set_R(int R);
     };
 
-}
+}  // namespace diskann
 
-#endif //MYANNS_VAMANA_H
+#endif  // MYANNS_VAMANA_H

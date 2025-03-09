@@ -11,9 +11,16 @@ else ()
     message(FATAL_ERROR "Please install OpenMP")
 endif ()
 
-SET(CMAKE_CXX_FLAGS "-fpic -w -DHAVE_CXX0X -fopenmp -ftree-vectorize -ftree-vectorizer-verbose=0 -lrt -DNDEBUG -march=native -Ofast")
+find_package(fmt)
+if (NOT fmt_FOUND)
+    message(FATAL_ERROR "Please install fmt")
+endif ()
+
+SET(CMAKE_CXX_FLAGS "-fpic -DHAVE_CXX0X -fopenmp -ftree-vectorize -Ofast -march=native -msse4.2 -mavx2 -mfma")
 
 include_directories(src)
 
 add_subdirectory(src)
 add_subdirectory(tests)
+
+target_link_libraries(myanns fmt::fmt)

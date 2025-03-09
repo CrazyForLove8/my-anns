@@ -23,28 +23,25 @@ namespace shnsw {
 
         FamilyMap families_;
 
-        HNSWGraph graph_;
+        void
+        build_internal() override;
 
     protected:
-        void addPoint(HNSWGraph &hnsw_graph,
-                      IndexOracle &oracle,
-                      unsigned index) override;
+        void
+        addPoint(unsigned index) override;
 
     public:
-        SHNSW(int max_neighbors,
+        SHNSW(DatasetPtr &dataset,
+              int max_neighbors,
               int ef_construction,
               float radius);
 
-        HNSWGraph build(IndexOracle &oracle) override;
-
-        Neighbors HNSW_search(HNSWGraph &hnsw_graph,
-                              IndexOracle &oracle,
-                              float *query,
-                              int topk,
-                              int ef_search) const override;
+        Neighbors
+        search(const float *query,
+               unsigned int topk,
+               unsigned int L) const override;
     };
 
+}  // namespace shnsw
 
-}
-
-#endif //MYANNS_SHNSW_H
+#endif  // MYANNS_SHNSW_H

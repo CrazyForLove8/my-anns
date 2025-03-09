@@ -1,47 +1,88 @@
 #include "taumng.h"
 
-using namespace graph;
-
-
-taumng::TauMNG::TauMNG(float t,
+taumng::TauMNG::TauMNG(DatasetPtr &dataset,
+                       Graph &graph,
+                       float t,
                        int h,
-                       int b) {
-    t_ = t;
-    h_ = h;
-    b_ = b;
+                       int b)
+        : Index(dataset), t_(t), h_(h), b_(b) {
+    graph_ = std::move(graph);
 }
 
-
-void taumng::TauMNG::set_b(int b) {
+void
+taumng::TauMNG::set_b(int b) {
     this->b_ = b;
 }
 
-
-void taumng::TauMNG::set_h(int h) {
+void
+taumng::TauMNG::set_h(int h) {
     this->h_ = h;
 }
 
+//void
+//taumng::TauMNG::build() {
+//    Timer timer;
+//    timer.start();
+//
+//    //    std::vector<int> final_graph_, offsets;
+//    //    project(graph_, final_graph_, offsets);
+//
+//#pragma omp parallel for schedule(dynamic, 256)
+//    for (int u = 0; u < graph_.size(); ++u) {
+//        if (u % 10000 == 0) {
+//            logger << "Processing " << u << " / " << graph_.size() << std::endl;
+//        }
+//        auto H_u_ = knn_search(oracle_.get(), graph_, (*oracle_)[u], h_, b_);
+//        for (auto& v : H_u_) {
+//            if (u == v.id) {
+//                continue;
+//            }
+//            bool exist = false;
+//            for (auto& w : graph_[u].candidates_) {
+//                if (w.id == v.id) {
+//                    exist = true;
+//                    break;
+//                }
+//            }
+//            if (exist) {
+//                continue;
+//            }
+//            if (v.distance <= 3 * t_) {
+//                graph_[u].addNeighbor(v);
+//            } else {
+//                bool flag = false;
+//                for (auto& w : graph_[u].candidates_) {
+//                    auto dist = (*oracle_)(w.id, v.id);
+//                    if (dist <= v.distance - 3 * t_) {
+//                        flag = true;
+//                        break;
+//                    }
+//                }
+//                if (!flag) {
+//                    graph_[u].addNeighbor(v);
+//                }
+//            }
+//        }
+//    }
+//
+//    timer.end();
+//    logger << "Construction time: " << timer.elapsed() << "s" << std::endl;
+//}
 
-void taumng::TauMNG::build(Graph &graph,
-                           IndexOracle &oracle) {
-    Timer timer;
-    timer.start();
-
-    std::vector<int> final_graph, offsets;
-    project(graph, final_graph, offsets);
-
+void
+taumng::TauMNG::build_internal() {
 #pragma omp parallel for schedule(dynamic, 256)
-    for (int u = 0; u < graph.size(); ++u) {
+    for (int u = 0; u < graph_.size(); ++u) {
         if (u % 10000 == 0) {
-            logger << "Processing " << u << " / " << graph.size() << std::endl;
+            logger << "Processing " << u << " / " << graph_.size() << std::endl;
         }
-        auto H_u_ = search(oracle, final_graph, offsets, oracle[u], h_, oracle.size(), b_);
+        auto H_u_ = knn_search(oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u], h_, b_);
         for (auto &v: H_u_) {
             if (u == v.id) {
                 continue;
             }
             bool exist = false;
-            for (auto &w: graph[u].candidates_) {
+            for (auto &w: graph_[u].candidates_) {
                 if (w.id == v.id) {
                     exist = true;
                     break;
@@ -51,23 +92,20 @@ void taumng::TauMNG::build(Graph &graph,
                 continue;
             }
             if (v.distance <= 3 * t_) {
-                graph[u].addNeighbor(v);
+                graph_[u].addNeighbor(v);
             } else {
                 bool flag = false;
-                for (auto &w: graph[u].candidates_) {
-                    auto dist = oracle(w.id, v.id);
+                for (auto &w: graph_[u].candidates_) {
+                    auto dist = (*oracle_)(w.id, v.id);
                     if (dist <= v.distance - 3 * t_) {
                         flag = true;
                         break;
                     }
                 }
                 if (!flag) {
-                    graph[u].addNeighbor(v);
+                    graph_[u].addNeighbor(v);
                 }
             }
         }
     }
-
-    timer.end();
-    logger << "Construction time: " << timer.elapsed() << "s" << std::endl;
 }

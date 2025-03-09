@@ -1,14 +1,17 @@
+#include "evaluator.h"
 #include "fgim.h"
-#include "utils.h"
 
 using namespace graph;
 
-int main(int argc, char **argv) {
+int
+main(int argc,
+     char **argv) {
     // set verbose to true if you want to see more information
     Log::setVerbose(false);
 
     if (argc < 6) {
-        std::cerr << "Usage: " << argv[0] << " <graph 1> <dataset 1> <graph 2> <dataset 2> <metric> <output>" << std::endl;
+        std::cerr << "Usage: " << argv[0]
+                  << " <graph 1> <dataset 1> <graph 2> <dataset 2> <metric> <output>" << std::endl;
         std::cerr << "Metric: l2, cosine" << std::endl;
         return 1;
     }
@@ -23,10 +26,11 @@ int main(int argc, char **argv) {
     loadGraph(g1, graph1);
     loadGraph(g2, graph2);
 
-    Matrix d1, d2;
+    Matrix<float> d1, d2;
     d1.load(dataset1);
     d2.load(dataset2);
-    MatrixOracle<metric::l2> oracle1(d1), oracle2(d2);
+    auto oracle1 = MatrixOracle<float, metric::l2>::getInstance(d1);
+    auto oracle2 = MatrixOracle<float, metric::l2>::getInstance(d2);
 
     if (d1.dim() != d2.dim()) {
         std::cerr << "Dataset dimension mismatch" << std::endl;
@@ -38,10 +42,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    Matrix merged;
+    Matrix<float> merged;
     mergeMatrix(d1, d2, merged);
 
-    MatrixOracle<metric::l2> oracle_merged(merged);
+    auto oracle_merged = MatrixOracle<float, metric::l2>::getInstance(merged);
 
     FGIM merge;
     auto graph = merge.merge(g1, oracle1, g2, oracle2, oracle_merged);
