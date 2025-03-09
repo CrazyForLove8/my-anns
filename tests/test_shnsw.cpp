@@ -60,7 +60,7 @@ main() {
 
     for (int level = 0; level < graph.size(); level++) {
         int cnt = 0;
-        for (auto &i: graph[level]) {
+        for (auto& i : graph[level]) {
             cnt += !i.candidates_.empty();
         }
         std::cout << "Level " << level << " has " << cnt << " nodes" << std::endl;
@@ -84,7 +84,7 @@ main() {
     }
     std::unordered_map<int, std::vector<int>> cluster_map;
 
-    for (const auto &entry: duplicate_map) {
+    for (const auto& entry : duplicate_map) {
         int point_id = entry.first;
         int cluster_id = entry.second;
         cluster_map[cluster_id].push_back(point_id);
@@ -93,9 +93,9 @@ main() {
     std::unordered_set<int> seen_clusters;
 
     std::vector<unsigned> search_Ls = {
-            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+        10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
     size_t qsize = query.size();
-    for (auto L: search_Ls) {
+    for (auto L : search_Ls) {
         float recall = 0;
         double qps = 0;
         //        float ilad = 0, ilmd = std::numeric_limits<float>::max();
@@ -116,13 +116,13 @@ main() {
                 }
                 std::unordered_set<unsigned> gt(groundTruth[i].begin(), groundTruth[i].begin() + K);
                 size_t correct = 0;
-                for (const auto &res: result) {
+                for (const auto& res : result) {
                     int cluster_id = duplicate_map[res.id];
                     if (seen_clusters.count(cluster_id)) {
                         continue;
                     }
                     auto cluster = cluster_map[cluster_id];
-                    for (auto &point_id: cluster) {
+                    for (auto& point_id : cluster) {
                         if (gt.find(point_id) != gt.end()) {
                             correct++;
                             break;
@@ -144,7 +144,7 @@ main() {
             timer.end();
             //            ilad = std::max(ilad, local_ilad / (qsize * K * (K - 1) /
             //            2)); ilmd = std::min(ilmd, local_ilmd);
-            qps = std::max(qps, (double) qsize / timer.elapsed());
+            qps = std::max(qps, (double)qsize / timer.elapsed());
             recall = std::max(local_recall / (static_cast<float>(qsize * K)), recall);
         }
         std::cout << "L: " << L << " recall: " << recall << " qps: " << qps << std::endl;

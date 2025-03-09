@@ -1,15 +1,19 @@
 #include "index.h"
 
-Index::Index() : dataset_(nullptr), base_(nullptr), oracle_(nullptr), built_(false), visited_list_pool_(nullptr) {
+Index::Index()
+    : dataset_(nullptr),
+      base_(nullptr),
+      oracle_(nullptr),
+      built_(false),
+      visited_list_pool_(nullptr) {
 }
 
-Index::Index(DatasetPtr &dataset,
-             bool allocate)
-        : dataset_(dataset),
-          oracle_(dataset->getOracle()),
-          base_(dataset->getBasePtr()),
-          visited_list_pool_(dataset->getVisitedListPool()),
-          built_(false) {
+Index::Index(DatasetPtr& dataset, bool allocate)
+    : dataset_(dataset),
+      oracle_(dataset->getOracle()),
+      base_(dataset->getBasePtr()),
+      visited_list_pool_(dataset->getVisitedListPool()),
+      built_(false) {
     if (allocate) {
         graph_.reserve(oracle_->size());
         graph_.resize(oracle_->size());
@@ -35,7 +39,8 @@ Index::build() {
     built_ = true;
 }
 
-void Index::reset(DatasetPtr &dataset) {
+void
+Index::reset(DatasetPtr& dataset) {
     dataset_ = dataset;
     oracle_ = dataset->getOracle();
     base_ = dataset->getBasePtr();
@@ -46,24 +51,23 @@ void Index::reset(DatasetPtr &dataset) {
     built_ = false;
 }
 
-Graph &
+Graph&
 Index::extractGraph() {
     return graph_;
 }
 
-DatasetPtr &
+DatasetPtr&
 Index::extractDataset() {
     return dataset_;
 }
 
-void Index::add(DatasetPtr &dataset) {
+void
+Index::add(DatasetPtr& dataset) {
     throw std::runtime_error("Index does not support add");
 }
 
 Neighbors
-Index::search(const float *query,
-              unsigned int topk,
-              unsigned int L) const {
+Index::search(const float* query, unsigned int topk, unsigned int L) const {
     if (!built_) {
         throw std::runtime_error("Index is not built");
     }

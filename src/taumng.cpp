@@ -1,11 +1,7 @@
 #include "taumng.h"
 
-taumng::TauMNG::TauMNG(DatasetPtr &dataset,
-                       Graph &graph,
-                       float t,
-                       int h,
-                       int b)
-        : Index(dataset), t_(t), h_(h), b_(b) {
+taumng::TauMNG::TauMNG(DatasetPtr& dataset, Graph& graph, float t, int h, int b)
+    : Index(dataset), t_(t), h_(h), b_(b) {
     graph_ = std::move(graph);
 }
 
@@ -76,13 +72,14 @@ taumng::TauMNG::build_internal() {
         if (u % 10000 == 0) {
             logger << "Processing " << u << " / " << graph_.size() << std::endl;
         }
-        auto H_u_ = knn_search(oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u], h_, b_);
-        for (auto &v: H_u_) {
+        auto H_u_ =
+            knn_search(oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u], h_, b_);
+        for (auto& v : H_u_) {
             if (u == v.id) {
                 continue;
             }
             bool exist = false;
-            for (auto &w: graph_[u].candidates_) {
+            for (auto& w : graph_[u].candidates_) {
                 if (w.id == v.id) {
                     exist = true;
                     break;
@@ -95,7 +92,7 @@ taumng::TauMNG::build_internal() {
                 graph_[u].addNeighbor(v);
             } else {
                 bool flag = false;
-                for (auto &w: graph_[u].candidates_) {
+                for (auto& w : graph_[u].candidates_) {
                     auto dist = (*oracle_)(w.id, v.id);
                     if (dist <= v.distance - 3 * t_) {
                         flag = true;

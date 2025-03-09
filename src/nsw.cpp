@@ -1,9 +1,7 @@
 #include "nsw.h"
 
-nsw::NSW::NSW(DatasetPtr &dataset,
-              int max_neighbors,
-              int ef_construction)
-        : Index(dataset), max_neighbors_(max_neighbors), ef_construction_(ef_construction) {
+nsw::NSW::NSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
+    : Index(dataset), max_neighbors_(max_neighbors), ef_construction_(ef_construction) {
 }
 
 //void
@@ -27,9 +25,14 @@ nsw::NSW::NSW(DatasetPtr &dataset,
 
 void
 nsw::NSW::addPoint(unsigned int index) {
-    auto res = knn_search(
-            oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[index], max_neighbors_, ef_construction_, -1,
-            index);
+    auto res = knn_search(oracle_.get(),
+                          visited_list_pool_.get(),
+                          graph_,
+                          (*oracle_)[index],
+                          max_neighbors_,
+                          ef_construction_,
+                          -1,
+                          index);
     graph_.emplace_back(max_neighbors_);
     for (int x = 0; x < max_neighbors_; ++x) {
         if (res[x].id == index || res[x].id == -1) {
@@ -41,8 +44,8 @@ nsw::NSW::addPoint(unsigned int index) {
 }
 
 Neighbors
-nsw::NSW::multisearch(const Graph &graph_,
-                      const IndexOracle<float> &oracle,
+nsw::NSW::multisearch(const Graph& graph_,
+                      const IndexOracle<float>& oracle,
                       unsigned int query,
                       int attempts,
                       int k) {
@@ -60,14 +63,14 @@ nsw::NSW::multisearch(const Graph &graph_,
         auto dist = oracle(query, entry_point);
         candidates.emplace(entry_point, dist, false);
         while (!candidates.empty()) {
-            auto &c = candidates.top();
+            auto& c = candidates.top();
             candidates.pop();
 
             if (results.size() >= k && c.distance > results[k - 1].distance) {
                 break;
             }
 
-            for (auto &v: graph_[c.id].candidates_) {
+            for (auto& v : graph_[c.id].candidates_) {
                 if (!visited[v.id]) {
                     visited[v.id] = true;
                     dist = oracle(query, v.id);
@@ -79,11 +82,10 @@ nsw::NSW::multisearch(const Graph &graph_,
         results.insert(results.end(), temp_results.begin(), temp_results.end());
         std::sort(results.begin(), results.end());
         results.erase(
-                std::unique(results.begin(),
-                            results.end(),
-                            [](const Neighbor &a,
-                               const Neighbor &b) { return a.id == b.id; }),
-                results.end());
+            std::unique(results.begin(),
+                        results.end(),
+                        [](const Neighbor& a, const Neighbor& b) { return a.id == b.id; }),
+            results.end());
     }
     results.resize(k);
     return results;

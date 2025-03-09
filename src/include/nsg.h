@@ -14,46 +14,44 @@
 using namespace graph;
 
 namespace nsg {
-    class NSG : public Index {
-    private:
-        int root{};
+class NSG : public Index {
+private:
+    int root{};
 
-        /**
+    /**
                    * search pool size
                    */
-        unsigned L_;
+    unsigned L_;
 
-        /**
+    /**
                    * maximum number of neighbors
                    */
-        unsigned m_;
+    unsigned m_;
 
-        void
-        build_internal() override;
+    void
+    build_internal() override;
 
-    public:
-        NSG(DatasetPtr &dataset,
-            unsigned L,
-            unsigned m);
+public:
+    NSG(DatasetPtr& dataset, unsigned L, unsigned m);
 
-        ~NSG() override = default;
+    ~NSG() override = default;
 
-        void
-        set_L(unsigned L) {
-            this->L_ = L;
-        }
+    void
+    set_L(unsigned L) {
+        this->L_ = L;
+    }
 
-        void
-        set_m(unsigned m) {
-            this->m_ = m;
-        }
+    void
+    set_m(unsigned m) {
+        this->m_ = m;
+    }
 
-        Neighbors
-        prune(std::vector<Neighbor> &candidates);
+    Neighbors
+    prune(std::vector<Neighbor>& candidates);
 
-        void
-        tree();
-    };
+    void
+    tree();
+};
 
 }  // namespace nsg
 

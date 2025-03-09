@@ -6,46 +6,44 @@
 #define MYANNS_HNSW_H
 
 #include <omp.h>
+
 #include <random>
 #include <unordered_set>
+
 #include "index.h"
 
 namespace hnsw {
 
-    class HNSW : public Index {
-    protected:
-        HGraph graph_;
+class HNSW : public Index {
+protected:
+    HGraph graph_;
 
-        FlattenHGraph flatten_graph_;
+    FlattenHGraph flatten_graph_;
 
-        uint32_t max_neighbors_;
+    uint32_t max_neighbors_;
 
-        uint32_t max_base_neighbors_;
+    uint32_t max_base_neighbors_;
 
-        uint32_t max_level_;
+    uint32_t max_level_;
 
-        uint32_t ef_construction_;
+    uint32_t ef_construction_;
 
-        uint32_t enter_point_;
+    uint32_t enter_point_;
 
-        double reverse_;
+    double reverse_;
 
-        std::unordered_set<int> visited_table_;
+    std::unordered_set<int> visited_table_;
 
-        std::default_random_engine random_engine_;
+    std::default_random_engine random_engine_;
 
-        virtual void
-        addPoint(unsigned index);
+    virtual void
+    addPoint(unsigned index);
 
-        Neighbors
-        searchLayer(
-                const Graph &graph,
-                const float *query,
-                size_t topk,
-                size_t L,
-                size_t entry_id) const;
+    Neighbors
+    searchLayer(
+        const Graph& graph, const float* query, size_t topk, size_t L, size_t entry_id) const;
 
-        /**
+    /**
                        * This implementation follows the original paper.
                        * @param graph
                        * @param oracle
@@ -54,60 +52,51 @@ namespace hnsw {
                        * @param ef
                        * @return
                        */
-        Neighbors
-        searchLayer(Graph &graph,
-                    IndexOracle<float> &oracle,
-                    float *query,
-                    int enter_point,
-                    int ef);
+    Neighbors
+    searchLayer(Graph& graph, IndexOracle<float>& oracle, float* query, int enter_point, int ef);
 
-        static int
-        seekPos(const Neighbors &vec);
+    static int
+    seekPos(const Neighbors& vec);
 
-        void
-        prune(Neighbors &candidates,
-              int max_neighbors);
+    void
+    prune(Neighbors& candidates, int max_neighbors);
 
-        void
-        build_internal() override;
+    void
+    build_internal() override;
 
-    public:
-        HNSW(DatasetPtr &dataset,
-             int max_neighbors,
-             int ef_construction);
+public:
+    HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
 
-        ~HNSW() override = default;
+    ~HNSW() override = default;
 
-        void
-        set_max_neighbors(int max_neighbors);
+    void
+    set_max_neighbors(int max_neighbors);
 
-        void
-        set_ef_construction(int ef_construction);
+    void
+    set_ef_construction(int ef_construction);
 
-        void
-        build() override;
+    void
+    build() override;
 
-        Graph &
-        extractGraph() override;
+    Graph&
+    extractGraph() override;
 
-        HGraph &
-        extractHGraph();
+    HGraph&
+    extractHGraph();
 
-        void
-        add(DatasetPtr &dataset) override;
+    void
+    add(DatasetPtr& dataset) override;
 
-        Neighbors
-        search(const float *query,
-               unsigned int topk,
-               unsigned int L) const override;
+    Neighbors
+    search(const float* query, unsigned int topk, unsigned int L) const override;
 
-        //        virtual Neighbors
-        //        HNSW_search(HGraph &hnsw_graph,
-        //                    IndexOracle<float> &oracle,
-        //                    float *query,
-        //                    int topk,
-        //                    int ef_search) const;
-    };
+    //        virtual Neighbors
+    //        HNSW_search(HGraph &hnsw_graph,
+    //                    IndexOracle<float> &oracle,
+    //                    float *query,
+    //                    int topk,
+    //                    int ef_search) const;
+};
 }  // namespace hnsw
 
 #endif  // MYANNS_HNSW_H

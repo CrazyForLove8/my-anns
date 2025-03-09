@@ -2,14 +2,12 @@
 
 using namespace graph;
 
-hnsw::HNSW::HNSW(DatasetPtr &dataset,
-                 int max_neighbors,
-                 int ef_construction)
-        : max_neighbors_(max_neighbors),
-          max_level_(0),
-          max_base_neighbors_(max_neighbors * 2),
-          ef_construction_(ef_construction),
-          Index(dataset, false) {
+hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
+    : max_neighbors_(max_neighbors),
+      max_level_(0),
+      max_base_neighbors_(max_neighbors * 2),
+      ef_construction_(ef_construction),
+      Index(dataset, false) {
     visited_table_ = std::unordered_set<int>();
     random_engine_.seed(2024);
     enter_point_ = 0;
@@ -17,7 +15,7 @@ hnsw::HNSW::HNSW(DatasetPtr &dataset,
 }
 
 int
-hnsw::HNSW::seekPos(const Neighbors &vec) {
+hnsw::HNSW::seekPos(const Neighbors& vec) {
     int left = 0, right = vec.size() - 1;
     if (vec[right].id > 0) {
         return right;
@@ -90,31 +88,36 @@ void
 hnsw::HNSW::addPoint(unsigned int index) {
     // TODO Levels can be computed before adding the point so that we can avoid enlarging the graph in the loop
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    auto level = (int) (-log(distribution(random_engine_)) * reverse_);
+    auto level = (int)(-log(distribution(random_engine_)) * reverse_);
     int cur_max_level_ = graph_.size() - 1;
 
     uint32_t cur_node_ = enter_point_;
     for (auto i = cur_max_level_; i > level; --i) {
         //        auto res = searchLayer(hnsw_graph[i], oracle, oracle[index],
         //        cur_node_, 1);
-        auto res = knn_search(oracle_.get(), visited_list_pool_.get(), graph_[i], (*oracle_)[index], 1, 1, cur_node_);
+        auto res = knn_search(
+            oracle_.get(), visited_list_pool_.get(), graph_[i], (*oracle_)[index], 1, 1, cur_node_);
         cur_node_ = res[0].id;
     }
 
     for (auto i = std::min(level, cur_max_level_); i >= 0; --i) {
-        Graph &graph = graph_[i];
-        auto &candidates = graph[index].candidates_;
+        Graph& graph = graph_[i];
+        auto& candidates = graph[index].candidates_;
         //        auto res = searchLayer(graph, oracle, oracle[index], cur_node_,
         //        ef_construction_);
-        auto res = knn_search(
-                oracle_.get(), visited_list_pool_.get(), graph, (*oracle_)[index], ef_construction_, ef_construction_,
-                cur_node_);
+        auto res = knn_search(oracle_.get(),
+                              visited_list_pool_.get(),
+                              graph,
+                              (*oracle_)[index],
+                              ef_construction_,
+                              ef_construction_,
+                              cur_node_);
 
         candidates.swap(res);
         auto cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
         prune(candidates, cur_max_cnt);
 
-        for (auto &e: candidates) {
+        for (auto& e : candidates) {
             graph[e.id].addNeighbor(Neighbor(index, e.distance, false));
             prune(graph[e.id].candidates_, cur_max_cnt);
         }
@@ -133,19 +136,14 @@ hnsw::HNSW::addPoint(unsigned int index) {
 
 struct CompareByCloser {
     bool
-    operator()(const Node &a,
-               const Node &b) {
+    operator()(const Node& a, const Node& b) {
         return a.distance > b.distance;
     }
 };
 
 Neighbors
 hnsw::HNSW::searchLayer(
-        const Graph &graph,
-        const float *query,
-        size_t topk,
-        size_t L,
-        size_t entry_id) const {
+    const Graph& graph, const float* query, size_t topk, size_t L, size_t entry_id) const {
     auto graph_sz = graph.size();
     std::vector<bool> visited(graph_sz, false);
     Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
@@ -157,7 +155,7 @@ hnsw::HNSW::searchLayer(
         if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
-            for (const auto &candidate: graph[n].candidates_) {
+            for (const auto& candidate : graph[n].candidates_) {
                 auto id = candidate.id;
                 if (visited[id])
                     continue;
@@ -182,11 +180,7 @@ hnsw::HNSW::searchLayer(
 
 Neighbors
 hnsw::HNSW::searchLayer(
-        Graph &graph,
-        IndexOracle<float> &oracle,
-        float *query,
-        int enter_point,
-        int ef) {
+    Graph& graph, IndexOracle<float>& oracle, float* query, int enter_point, int ef) {
     visited_table_.clear();
     visited_table_.insert(enter_point);
     std::priority_queue<Node, std::vector<Node>, CompareByCloser> candidates;
@@ -203,7 +197,7 @@ hnsw::HNSW::searchLayer(
             break;
         }
         candidates.pop();
-        for (auto &n: graph[c.id].candidates_) {
+        for (auto& n : graph[c.id].candidates_) {
             if (visited_table_.find(n.id) == visited_table_.end()) {
                 visited_table_.insert(n.id);
                 auto d = oracle(n.id, query);
@@ -231,15 +225,14 @@ hnsw::HNSW::searchLayer(
 }
 
 void
-hnsw::HNSW::prune(Neighbors &candidates,
-                  int max_neighbors) {
+hnsw::HNSW::prune(Neighbors& candidates, int max_neighbors) {
     if (candidates.size() <= max_neighbors) {
         return;
     }
     Neighbors ret_set;
-    for (auto &v: candidates) {
+    for (auto& v : candidates) {
         bool prune = false;
-        for (auto &w: ret_set) {
+        for (auto& w : ret_set) {
             if ((*oracle_)(v.id, w.id) < v.distance) {
                 prune = true;
                 break;
@@ -295,9 +288,7 @@ hnsw::HNSW::prune(Neighbors &candidates,
 //}
 
 Neighbors
-hnsw::HNSW::search(const float *query,
-                   unsigned int topk,
-                   unsigned int L) const {
+hnsw::HNSW::search(const float* query, unsigned int topk, unsigned int L) const {
     unsigned cur_node_ = enter_point_;
     //    for (int i = graph_.size() - 1; i > 0; --i) {
     //        auto res = knn_search(oracle_.get(), graph_[i], query, 1, 1, cur_node_);
@@ -305,20 +296,22 @@ hnsw::HNSW::search(const float *query,
     //    }
     //    auto res = knn_search(oracle_.get(), graph_[0], query, topk, L, cur_node_);
     for (int i = flatten_graph_.size() - 1; i > 0; --i) {
-        auto res = graph::search(oracle_.get(), visited_list_pool_.get(), flatten_graph_[i], query, 1, 1, cur_node_);
+        auto res = graph::search(
+            oracle_.get(), visited_list_pool_.get(), flatten_graph_[i], query, 1, 1, cur_node_);
         cur_node_ = res[0].id;
     }
-    auto res = graph::search(oracle_.get(), visited_list_pool_.get(), flatten_graph_[0], query, topk, L, cur_node_);
+    auto res = graph::search(
+        oracle_.get(), visited_list_pool_.get(), flatten_graph_[0], query, topk, L, cur_node_);
     return res;
 }
 
-Graph &
+Graph&
 hnsw::HNSW::extractGraph() {
     throw std::runtime_error(
-            "HNSW does not support extractGraph, please use extractHGraph instead");
+        "HNSW does not support extractGraph, please use extractHGraph instead");
 }
 
-HGraph &
+HGraph&
 hnsw::HNSW::extractHGraph() {
     return graph_;
 }
@@ -352,19 +345,20 @@ hnsw::HNSW::build() {
     built_ = true;
 }
 
-void hnsw::HNSW::add(DatasetPtr &dataset) {
+void
+hnsw::HNSW::add(DatasetPtr& dataset) {
     if (!built_) {
         throw std::runtime_error("Index is not built yet");
     }
     built_ = false;
     auto cur_size = oracle_->size();
     auto total = dataset->getOracle()->size() + cur_size;
-    for (auto &level: graph_) {
+    for (auto& level : graph_) {
         level.resize(total);
     }
 
-    auto &cur_base = base_;
-    auto &new_base = dataset->getBase();
+    auto& cur_base = base_;
+    auto& new_base = dataset->getBase();
     cur_base->append(new_base);
     oracle_->reset(*cur_base);
 
@@ -385,11 +379,13 @@ void hnsw::HNSW::add(DatasetPtr &dataset) {
     built_ = true;
 }
 
-void hnsw::HNSW::set_max_neighbors(int max_neighbors) {
+void
+hnsw::HNSW::set_max_neighbors(int max_neighbors) {
     this->max_neighbors_ = max_neighbors;
     reverse_ = 1 / log(1.0 * max_neighbors_);
 }
 
-void hnsw::HNSW::set_ef_construction(int ef_construction) {
+void
+hnsw::HNSW::set_ef_construction(int ef_construction) {
     this->ef_construction_ = ef_construction;
 }

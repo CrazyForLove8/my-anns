@@ -1,10 +1,9 @@
 #include "dataset.h"
 
-std::unordered_set <std::string> angular_datasets = {"deep", "glove", "crawl"};
+std::unordered_set<std::string> angular_datasets = {"deep", "glove", "crawl"};
 
-std::shared_ptr <Dataset>
-Dataset::getInstance(const std::string &name,
-                     const std::string &size) {
+std::shared_ptr<Dataset>
+Dataset::getInstance(const std::string& name, const std::string& size) {
     auto dataset = std::make_shared<Dataset>();
     dataset->name_ = name;
     dataset->size_ = size;
@@ -14,9 +13,9 @@ Dataset::getInstance(const std::string &name,
 }
 
 Dataset::Dataset() {
-    base_ = std::make_shared < Matrix < float >> ();
-    query_ = std::make_shared < Matrix < float >> ();
-    groundTruth_ = std::make_shared < Matrix < int >> ();
+    base_ = std::make_shared<Matrix<float>>();
+    query_ = std::make_shared<Matrix<float>>();
+    groundTruth_ = std::make_shared<Matrix<int>>();
 
     distance_ = DISTANCE::L2;
     oracle_ = nullptr;
@@ -82,7 +81,7 @@ Dataset::load() {
     visited_list_pool_ = VisitedListPool::getInstance(base_->size());
 }
 
-Matrix<float> &
+Matrix<float>&
 Dataset::getBase() {
     if (base_->empty()) {
         throw std::runtime_error("Base matrix is empty");
@@ -90,7 +89,7 @@ Dataset::getBase() {
     return *base_;
 }
 
-Matrix<float> &
+Matrix<float>&
 Dataset::getQuery() {
     if (!full_dataset_) {
         throw std::runtime_error("Dataset is not fully loaded");
@@ -101,7 +100,7 @@ Dataset::getQuery() {
     return *query_;
 }
 
-Matrix<int> &
+Matrix<int>&
 Dataset::getGroundTruth() {
     if (!full_dataset_) {
         throw std::runtime_error("Dataset is not fully loaded");
@@ -112,17 +111,18 @@ Dataset::getGroundTruth() {
     return *groundTruth_;
 }
 
-OraclePtr &
+OraclePtr&
 Dataset::getOracle() {
     return oracle_;
 }
 
-VisitedListPoolPtr &Dataset::getVisitedListPool() {
+VisitedListPoolPtr&
+Dataset::getVisitedListPool() {
     return visited_list_pool_;
 }
 
-void Dataset::split(std::vector <DatasetPtr> &datasets,
-                    unsigned int num) {
+void
+Dataset::split(std::vector<DatasetPtr>& datasets, unsigned int num) {
     if (!full_dataset_) {
         throw std::runtime_error("Dataset is not fully loaded");
     }
@@ -142,11 +142,13 @@ void Dataset::split(std::vector <DatasetPtr> &datasets,
     }
     for (unsigned int i = 0; i < num - 1; i++) {
         datasets[i] = std::make_shared<Dataset>();
-        datasets[i]->base_ = std::make_shared<Matrix<float >>(matrices[i]);
+        datasets[i]->base_ = std::make_shared<Matrix<float>>(matrices[i]);
         if (angular) {
-            datasets[i]->oracle_ = MatrixOracle<float, metric::angular>::getInstance(*datasets[i]->base_);
+            datasets[i]->oracle_ =
+                MatrixOracle<float, metric::angular>::getInstance(*datasets[i]->base_);
         } else {
-            datasets[i]->oracle_ = MatrixOracle<float, metric::l2>::getInstance(*datasets[i]->base_);
+            datasets[i]->oracle_ =
+                MatrixOracle<float, metric::l2>::getInstance(*datasets[i]->base_);
         }
         datasets[i]->full_dataset_ = false;
         datasets[i]->name_ = name_;
@@ -156,12 +158,13 @@ void Dataset::split(std::vector <DatasetPtr> &datasets,
     }
 }
 
-void Dataset::merge(std::vector <DatasetPtr> &datasets) {
+void
+Dataset::merge(std::vector<DatasetPtr>& datasets) {
     if (!full_dataset_) {
         throw std::runtime_error("Dataset is not the full dataset");
     }
-    std::vector <MatrixPtr<float>> matrices;
-    for (auto &dataset: datasets) {
+    std::vector<MatrixPtr<float>> matrices;
+    for (auto& dataset : datasets) {
         if (distance_ != dataset->distance_) {
             throw std::runtime_error("Cannot merge datasets with different distance metrics");
         }
@@ -174,22 +177,22 @@ void Dataset::merge(std::vector <DatasetPtr> &datasets) {
     oracle_->reset(*base_);
 }
 
-
-DatasetPtr Dataset::aggregate(std::vector <DatasetPtr> &datasets) {
+DatasetPtr
+Dataset::aggregate(std::vector<DatasetPtr>& datasets) {
     // TODO support merging datasets without query and ground truth
     if (datasets.empty()) {
         throw std::runtime_error("No dataset to merge");
     }
     DatasetPtr base = nullptr;
-    for (auto &dataset: datasets) {
+    for (auto& dataset : datasets) {
         if (dataset->full_dataset_) {
             base = dataset;
             break;
         }
     }
     auto distance = base->getDistance();
-    std::vector <MatrixPtr<float>> matrices;
-    for (const auto &dataset: datasets) {
+    std::vector<MatrixPtr<float>> matrices;
+    for (const auto& dataset : datasets) {
         matrices.emplace_back(dataset->getBasePtr());
         if (dataset->full_dataset_) {
             continue;
@@ -202,7 +205,7 @@ DatasetPtr Dataset::aggregate(std::vector <DatasetPtr> &datasets) {
         }
     }
 
-    auto matrixPtr = std::make_shared < Matrix < float >> (matrices);
+    auto matrixPtr = std::make_shared<Matrix<float>>(matrices);
     auto dataset = std::make_shared<Dataset>();
     dataset->base_ = matrixPtr;
     dataset->distance_ = distance;
@@ -219,31 +222,31 @@ DatasetPtr Dataset::aggregate(std::vector <DatasetPtr> &datasets) {
     return dataset;
 }
 
-DISTANCE &Dataset::getDistance() {
+DISTANCE&
+Dataset::getDistance() {
     return distance_;
 }
 
-MatrixPtr<float> &Dataset::getBasePtr() {
+MatrixPtr<float>&
+Dataset::getBasePtr() {
     return base_;
 }
 
-std::vector <std::vector<unsigned int>>
-graph::loadGroundTruth(const std::string &filename,
-                       unsigned int qsize,
-                       unsigned int K) {
+std::vector<std::vector<unsigned int>>
+graph::loadGroundTruth(const std::string& filename, unsigned int qsize, unsigned int K) {
     std::ifstream input(filename, std::ios::binary);
     if (!input.is_open()) {
         throw std::runtime_error("Cannot open file " + filename);
     }
-    std::vector <std::vector<unsigned>> groundTruth(qsize, std::vector<unsigned>(K));
+    std::vector<std::vector<unsigned>> groundTruth(qsize, std::vector<unsigned>(K));
     int t;
-    input.read((char *) &t, 4);
+    input.read((char*)&t, 4);
     std::vector<int> temp(t);
     input.seekg(0, std::ios::beg);
     for (int i = 0; i < qsize; i++) {
         int t;
-        input.read((char *) &t, 4);
-        input.read((char *) temp.data(), K * 4);
+        input.read((char*)&t, 4);
+        input.read((char*)temp.data(), K * 4);
         for (int j = 0; j < K; j++) {
             groundTruth[i][j] = temp[j];
         }

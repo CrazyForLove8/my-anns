@@ -1,17 +1,11 @@
 #include "dhnsw.h"
 
-dhnsw::DHNSW::DHNSW(DatasetPtr &dataset,
-                    int max_neighbors,
-                    int ef_construction,
-                    float lambda)
-        : HNSW(dataset, max_neighbors, ef_construction), lambda_(lambda) {
+dhnsw::DHNSW::DHNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction, float lambda)
+    : HNSW(dataset, max_neighbors, ef_construction), lambda_(lambda) {
 }
 
 Neighbors
-naive(Neighbors res,
-      IndexOracle<float> *oracle,
-      int topk,
-      float lambda) {
+naive(Neighbors res, IndexOracle<float>* oracle, int topk, float lambda) {
     if (res.size() <= topk) {
         return res;
     }
@@ -24,7 +18,7 @@ naive(Neighbors res,
             break;
         }
         bool add = true;
-        for (auto &r: ret) {
+        for (auto& r : ret) {
             if ((*oracle)(r.id, res[idx].id) < lambda) {
                 add = false;
                 break;
@@ -39,10 +33,7 @@ naive(Neighbors res,
 }
 
 Neighbors
-MMR(Neighbors res,
-    IndexOracle<float> *oracle,
-    int topk,
-    float lambda) {
+MMR(Neighbors res, IndexOracle<float>* oracle, int topk, float lambda) {
     if (res.size() <= topk) {
         return res;
     }
@@ -50,26 +41,25 @@ MMR(Neighbors res,
     ret.emplace_back(res[0]);
     // lambda controls the trade-off between similarity and diversity, ranging
     // from 0 to 1
-    for (auto &r: res) {
+    for (auto& r : res) {
         r.flag = false;
     }
     while (ret.size() < topk) {
-        std::vector <std::pair<int, float>> scores;
+        std::vector<std::pair<int, float>> scores;
         for (int idx = 1; idx < res.size(); ++idx) {
             if (res[idx].flag)
                 continue;
             float min_dist = std::numeric_limits<float>::max();
-            for (auto &r: ret) {
+            for (auto& r : ret) {
                 min_dist = std::min(min_dist, (*oracle)(r.id, res[idx].id));
             }
             float score = -lambda * res[idx].distance + (1 - lambda) * min_dist;
             scores.emplace_back(idx, score);
         }
         auto max_ =
-                std::max_element(scores.begin(), scores.end(), [](const auto &a,
-                                                                  const auto &b) {
-                    return a.second < b.second;
-                });
+            std::max_element(scores.begin(), scores.end(), [](const auto& a, const auto& b) {
+                return a.second < b.second;
+            });
         ret.emplace_back(res[max_->first]);
         res[max_->first].flag = true;
     }
@@ -78,9 +68,7 @@ MMR(Neighbors res,
 }
 
 Neighbors
-dhnsw::DHNSW::search(const float *query,
-                     unsigned int topk,
-                     unsigned int L) const {
+dhnsw::DHNSW::search(const float* query, unsigned int topk, unsigned int L) const {
     unsigned cur_node_ = enter_point_;
     for (auto i = graph_.size() - 1; i > 0; --i) {
         auto res = searchLayer(graph_[i], query, 1, 1, cur_node_);

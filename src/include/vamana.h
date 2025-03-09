@@ -12,48 +12,43 @@
 #include "index.h"
 
 namespace diskann {
-    class Vamana : public Index {
-    private:
-        /**
+class Vamana : public Index {
+private:
+    /**
                    * alpha
                    */
-        float alpha_;
+    float alpha_;
 
-        /*
+    /*
                    * HNSW_search pool size
                    */
-        int L_;
+    int L_;
 
-        /**
+    /**
                    * maximum number of neighbors
                    */
-        int R_;
+    int R_;
 
-        void
-        RobustPrune(float alpha,
-                    int point,
-                    Neighbors &candidates);
+    void
+    RobustPrune(float alpha, int point, Neighbors& candidates);
 
-        void
-        build_internal() override;
+    void
+    build_internal() override;
 
-    public:
-        Vamana(DatasetPtr &dataset,
-               float alpha,
-               int L,
-               int R);
+public:
+    Vamana(DatasetPtr& dataset, float alpha, int L, int R);
 
-        ~Vamana() override = default;
+    ~Vamana() override = default;
 
-        void
-        set_alpha(float alpha);
+    void
+    set_alpha(float alpha);
 
-        void
-        set_L(int L);
+    void
+    set_L(int L);
 
-        void
-        set_R(int R);
-    };
+    void
+    set_R(int R);
+};
 
 }  // namespace diskann
 

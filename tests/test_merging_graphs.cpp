@@ -4,8 +4,7 @@
 using namespace graph;
 
 int
-main(int argc,
-     char **argv) {
+main(int argc, char** argv) {
     // set verbose to true if you want to see more information
     Log::setVerbose(false);
 

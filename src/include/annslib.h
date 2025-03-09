@@ -5,14 +5,14 @@
 #ifndef MYANNS_ANNSLIB_H
 #define MYANNS_ANNSLIB_H
 
+#include "evaluator.h"
+#include "fgim.h"
 #include "hnsw.h"
+#include "mgraph.h"
 #include "nndescent.h"
+#include "nsg.h"
 #include "nsw.h"
 #include "taumng.h"
 #include "vamana.h"
-#include "nsg.h"
-#include "evaluator.h"
-#include "fgim.h"
-#include "mgraph.h"
 
-#endif //MYANNS_ANNSLIB_H
+#endif  //MYANNS_ANNSLIB_H

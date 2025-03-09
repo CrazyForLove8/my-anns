@@ -11,21 +11,16 @@ using namespace hnsw;
 
 namespace dhnsw {
 
-    class DHNSW : public HNSW {
-    private:
-        float lambda_;
+class DHNSW : public HNSW {
+private:
+    float lambda_;
 
-    public:
-        DHNSW(DatasetPtr &dataset,
-              int max_neighbors,
-              int ef_construction,
-              float lambda);
+public:
+    DHNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction, float lambda);
 
-        Neighbors
-        search(const float *query,
-               unsigned int topk,
-               unsigned int L) const override;
-    };
+    Neighbors
+    search(const float* query, unsigned int topk, unsigned int L) const override;
+};
 
 }  // namespace dhnsw
 

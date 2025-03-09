@@ -13,40 +13,36 @@
 
 namespace nndescent {
 
-    class NNDescent : public Index {
-    private:
-        unsigned K_{64};
+class NNDescent : public Index {
+private:
+    unsigned K_{64};
 
-        float rho_{0.5};
+    float rho_{0.5};
 
-        float delta_{0.001};
+    float delta_{0.001};
 
-        unsigned iteration_{100};
+    unsigned iteration_{100};
 
-        void
-        initializeGraph();
+    void
+    initializeGraph();
 
-        void
-        generateUpdate();
+    void
+    generateUpdate();
 
-        int
-        applyUpdate(unsigned sample);
+    int
+    applyUpdate(unsigned sample);
 
-        void
-        clearGraph();
+    void
+    clearGraph();
 
-        void
-        build_internal() override;
+    void
+    build_internal() override;
 
-    public:
-        NNDescent(DatasetPtr &dataset,
-                  int K,
-                  float rho = 0.5,
-                  float delta = 0.001,
-                  int iteration = 20);
+public:
+    NNDescent(DatasetPtr& dataset, int K, float rho = 0.5, float delta = 0.001, int iteration = 20);
 
-        ~NNDescent() override = default;
-    };
+    ~NNDescent() override = default;
+};
 }  // namespace nndescent
 
 #endif  // MYANNS_NNDESCENT_H

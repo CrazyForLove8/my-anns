@@ -24,7 +24,7 @@ private:
     uint32_t ef_construction_;
 
     void
-    CrossQuery(std::vector<IndexPtr> &indexes) override;
+    CrossQuery(std::vector<IndexPtr>& indexes) override;
 
     void
     Refinement() override;
@@ -33,23 +33,18 @@ private:
     ReconstructHGraph();
 
     void
-    heuristic(Neighbors &candidates);
+    heuristic(Neighbors& candidates);
 
 public:
     MGraph();
 
-    explicit MGraph(unsigned int max_degree,
-                    unsigned int ef_construction,
-                    float sample_rate = 0.3);
+    explicit MGraph(unsigned int max_degree, unsigned int ef_construction, float sample_rate = 0.3);
 
     void
-    Combine(std::vector<IndexPtr> &indexes) override;
+    Combine(std::vector<IndexPtr>& indexes) override;
 
     Neighbors
-    search(const float *query,
-           unsigned int topk,
-           unsigned int L) const override;
+    search(const float* query, unsigned int topk, unsigned int L) const override;
 };
 
-
-#endif //MYANNS_MGRAPH_H
+#endif  //MYANNS_MGRAPH_H

@@ -1,6 +1,7 @@
 #include "annslib.h"
 
-void testMerge() {
+void
+testMerge() {
     omp_set_num_threads(1);
     auto dataset = Dataset::getInstance("sift", "1m");
     auto datasets = std::vector<DatasetPtr>();
@@ -15,14 +16,15 @@ void testMerge() {
     hnsw2->build();
 
     std::vector<IndexPtr> vec = {hnsw1, hnsw2};
-    MGraph mgraph(20, 200);
+    MGraph mgraph(40, 200);
 
     mgraph.Combine(vec);
 
     eval(mgraph, mgraph.extractDataset(), 200);
 }
 
-int main() {
+int
+main() {
     Log::setVerbose(true);
 
     testMerge();

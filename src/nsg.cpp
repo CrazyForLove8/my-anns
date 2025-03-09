@@ -1,8 +1,6 @@
 #include "nsg.h"
 
-nsg::NSG::NSG(DatasetPtr &dataset,
-              unsigned int L,
-              unsigned int m) : Index(dataset), L_(L), m_(m) {
+nsg::NSG::NSG(DatasetPtr& dataset, unsigned int L, unsigned int m) : Index(dataset), L_(L), m_(m) {
 }
 
 //void
@@ -34,11 +32,11 @@ nsg::NSG::NSG(DatasetPtr &dataset,
 //}
 
 std::vector<Neighbor>
-nsg::NSG::prune(std::vector<Neighbor> &candidates) {
+nsg::NSG::prune(std::vector<Neighbor>& candidates) {
     std::vector<Neighbor> prunedNeighbors;
-    for (auto &&v: candidates) {
+    for (auto&& v : candidates) {
         auto flag = false;
-        for (auto &&w: prunedNeighbors) {
+        for (auto&& w : prunedNeighbors) {
             if ((*oracle_)(w.id, v.id) < v.distance) {
                 flag = true;
                 break;
@@ -60,9 +58,7 @@ nsg::NSG::tree() {
    * TODO Here needs to be fixed
    * Too many recursion
    */
-    auto dfs = [&](int start,
-                   const Graph &g,
-                   std::vector<bool> &visited) {
+    auto dfs = [&](int start, const Graph& g, std::vector<bool>& visited) {
         std::stack<int> s;
         s.push(start);
         visited[start] = true;
@@ -70,7 +66,7 @@ nsg::NSG::tree() {
         while (!s.empty()) {
             int node = s.top();
             s.pop();
-            for (const auto &neighbor: g[node].candidates_) {
+            for (const auto& neighbor : g[node].candidates_) {
                 if (!visited[neighbor.id]) {
                     visited[neighbor.id] = true;
                     s.push(neighbor.id);
@@ -89,7 +85,7 @@ nsg::NSG::tree() {
                 auto candidates = track_search(oracle_.get(), graph_, (*oracle_)[i], root, L_);
                 bool added = false;
                 int idx = 0;
-                for (auto &&candidate: candidates) {
+                for (auto&& candidate : candidates) {
                     if (!visited[candidate.id]) {
                         continue;
                     }
@@ -119,7 +115,7 @@ nsg::NSG::tree() {
 
 void
 nsg::NSG::build_internal() {
-    auto *center = new float[oracle_->dim()];
+    auto* center = new float[oracle_->dim()];
     for (unsigned i = 0; i < oracle_->size(); ++i) {
         auto pt = (*oracle_)[i];
         for (unsigned j = 0; j < oracle_->dim(); ++j) {
@@ -138,7 +134,7 @@ nsg::NSG::build_internal() {
             logger << "Adding " << u << " / " << graph_.size() << std::endl;
         }
         std::vector<Neighbor> candidates =
-                track_search(oracle_.get(), graph_, (*oracle_)[u], root, L_);
+            track_search(oracle_.get(), graph_, (*oracle_)[u], root, L_);
         graph_[u].candidates_ = prune(candidates);
     }
 

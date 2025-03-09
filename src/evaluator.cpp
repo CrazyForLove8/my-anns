@@ -5,14 +5,9 @@
 #endif
 
 void
-evaluate(Index &index,
-         DatasetPtr &dataset,
-         unsigned qsize,
-         unsigned L,
-         unsigned K,
-         unsigned runs) {
-    auto &query = dataset->getQuery();
-    auto &groundTruth = dataset->getGroundTruth();
+evaluate(Index& index, DatasetPtr& dataset, unsigned qsize, unsigned L, unsigned K, unsigned runs) {
+    auto& query = dataset->getQuery();
+    auto& groundTruth = dataset->getGroundTruth();
     float recall = 0;
     double qps = 0;
     for (int x = 0; x < runs; ++x) {
@@ -20,13 +15,13 @@ evaluate(Index &index,
         timer.start();
         float local_recall = 0;
 #if MULTITHREAD
-#pragma omp parallel for reduction(+:local_recall)
+#pragma omp parallel for reduction(+ : local_recall)
 #endif
         for (size_t i = 0; i < qsize; ++i) {
             auto result = index.search(query[i], K, L);
             std::unordered_set<unsigned> gt(groundTruth[i], groundTruth[i] + K);
             size_t correct = 0;
-            for (const auto &res: result) {
+            for (const auto& res : result) {
                 if (gt.find(res.id) != gt.end()) {
                     correct++;
                 }
@@ -34,21 +29,21 @@ evaluate(Index &index,
             local_recall += static_cast<float>(correct);
         }
         timer.end();
-        qps = std::max(qps, (double) qsize / timer.elapsed());
+        qps = std::max(qps, (double)qsize / timer.elapsed());
         recall = std::max(local_recall / (static_cast<float>(qsize * K)), recall);
     }
     std::cout << "L: " << L << " recall: " << recall << " qps: " << qps << std::endl;
 }
 
 void
-evaluate(const IndexPtr &index,
-         DatasetPtr &dataset,
+evaluate(const IndexPtr& index,
+         DatasetPtr& dataset,
          unsigned qsize,
          unsigned L,
          unsigned K,
          unsigned runs) {
-    auto &query = dataset->getQuery();
-    auto &groundTruth = dataset->getGroundTruth();
+    auto& query = dataset->getQuery();
+    auto& groundTruth = dataset->getGroundTruth();
     float recall = 0;
     double qps = 0;
     for (int x = 0; x < runs; ++x) {
@@ -56,13 +51,13 @@ evaluate(const IndexPtr &index,
         timer.start();
         float local_recall = 0;
 #if MULTITHREAD
-#pragma omp parallel for reduction(+:local_recall)
+#pragma omp parallel for reduction(+ : local_recall)
 #endif
         for (size_t i = 0; i < qsize; ++i) {
             auto result = index->search(query[i], K, L);
             std::unordered_set<unsigned> gt(groundTruth[i], groundTruth[i] + K);
             size_t correct = 0;
-            for (const auto &res: result) {
+            for (const auto& res : result) {
                 if (gt.find(res.id) != gt.end()) {
                     correct++;
                 }
@@ -70,7 +65,7 @@ evaluate(const IndexPtr &index,
             local_recall += static_cast<float>(correct);
         }
         timer.end();
-        qps = std::max(qps, (double) qsize / timer.elapsed());
+        qps = std::max(qps, (double)qsize / timer.elapsed());
         recall = std::max(local_recall / (static_cast<float>(qsize * K)), recall);
     }
     std::cout << "L: " << L << " recall: " << recall << " qps: " << qps << std::endl;
@@ -78,7 +73,7 @@ evaluate(const IndexPtr &index,
 
 void
 graph::eval(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
-            DatasetPtr &dataset,
+            DatasetPtr& dataset,
             unsigned search_L,
             unsigned K,
             unsigned runs) {
@@ -88,7 +83,7 @@ graph::eval(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             throw std::runtime_error("IndexPtr in variant is null!");
         }
     } else if (std::holds_alternative<std::reference_wrapper<Index>>(index)) {
-        auto &ref = std::get<std::reference_wrapper<Index>>(index).get();
+        auto& ref = std::get<std::reference_wrapper<Index>>(index).get();
         if (&ref == nullptr) {
             throw std::runtime_error("Reference in variant is null!");
         }
@@ -99,13 +94,13 @@ graph::eval(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
     std::vector<unsigned> search_Ls;
     if (search_L == -1) {
         search_Ls = {
-                10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
     } else {
         search_Ls = {search_L};
     }
     size_t qsize = dataset->getQuery().size();
 
-    for (auto L: search_Ls) {
+    for (auto L : search_Ls) {
         if (std::holds_alternative<IndexPtr>(index)) {
             evaluate(std::get<IndexPtr>(index), dataset, qsize, L, K, runs);
         } else {

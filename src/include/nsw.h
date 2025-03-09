@@ -12,43 +12,37 @@
 #include "index.h"
 
 namespace nsw {
-    class NSW : public Index {
-    private:
-        int max_neighbors_;
+class NSW : public Index {
+private:
+    int max_neighbors_;
 
-        int ef_construction_;
+    int ef_construction_;
 
-        void
-        addPoint(unsigned index);
+    void
+    addPoint(unsigned index);
 
-        Neighbors
-        multisearch(
-                const Graph &graph,
-                const IndexOracle<float> &oracle,
-                unsigned query,
-                int attempts,
-                int k);
+    Neighbors
+    multisearch(
+        const Graph& graph, const IndexOracle<float>& oracle, unsigned query, int attempts, int k);
 
-        void
-        build_internal() override;
+    void
+    build_internal() override;
 
-    public:
-        NSW(DatasetPtr &dataset,
-            int max_neighbors,
-            int ef_construction);
+public:
+    NSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
 
-        ~NSW() override = default;
+    ~NSW() override = default;
 
-        void
-        set_max_neighbors(int max_neighbors) {
-            this->max_neighbors_ = max_neighbors;
-        }
+    void
+    set_max_neighbors(int max_neighbors) {
+        this->max_neighbors_ = max_neighbors;
+    }
 
-        void
-        set_ef_construction(int ef_construction) {
-            this->ef_construction_ = ef_construction;
-        }
-    };
+    void
+    set_ef_construction(int ef_construction) {
+        this->ef_construction_ = ef_construction;
+    }
+};
 }  // namespace nsw
 
 #endif  // MYANNS_NSW_H

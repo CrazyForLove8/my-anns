@@ -1,10 +1,7 @@
 #include "vamana.h"
 
-diskann::Vamana::Vamana(DatasetPtr &dataset,
-                        float alpha,
-                        int L,
-                        int R)
-        : Index(dataset), alpha_(alpha), L_(L), R_(R) {
+diskann::Vamana::Vamana(DatasetPtr& dataset, float alpha, int L, int R)
+    : Index(dataset), alpha_(alpha), L_(L), R_(R) {
 }
 
 void
@@ -89,11 +86,9 @@ diskann::Vamana::set_R(int R) {
 //}
 
 void
-diskann::Vamana::RobustPrune(float alpha,
-                             int point,
-                             Neighbors &candidates) {
+diskann::Vamana::RobustPrune(float alpha, int point, Neighbors& candidates) {
     candidates.insert(
-            candidates.begin(), graph_[point].candidates_.begin(), graph_[point].candidates_.end());
+        candidates.begin(), graph_[point].candidates_.begin(), graph_[point].candidates_.end());
     auto it = std::find(candidates.begin(), candidates.end(), Neighbor(point, 0, false));
     if (it != candidates.end()) {
         candidates.erase(it);
@@ -108,7 +103,7 @@ diskann::Vamana::RobustPrune(float alpha,
         }
         candidates.erase(std::remove_if(candidates.begin(),
                                         candidates.end(),
-                                        [&](const Neighbor &p_prime_) {
+                                        [&](const Neighbor& p_prime_) {
                                             return alpha * (*oracle_)(p_star_.id, p_prime_.id) <=
                                                    p_prime_.distance;
                                         }),
@@ -124,7 +119,7 @@ diskann::Vamana::build_internal() {
         std::vector<int> init_(R_);
         gen_random(rng, init_.data(), R_, n);
         graph_[u].M_ = R_;
-        for (auto &v: init_) {
+        for (auto& v : init_) {
             if (u == v) {
                 continue;
             }
@@ -134,7 +129,7 @@ diskann::Vamana::build_internal() {
         std::sort(graph_[u].candidates_.begin(), graph_[u].candidates_.end());
     }
 
-    auto *center = new float[oracle_->dim()];
+    auto* center = new float[oracle_->dim()];
     for (unsigned i = 0; i < oracle_->size(); ++i) {
         auto pt = (*oracle_)[i];
         for (unsigned j = 0; j < oracle_->dim(); ++j) {
@@ -165,7 +160,7 @@ diskann::Vamana::build_internal() {
         }
         auto res = track_search(oracle_.get(), graph_, (*oracle_)[permutation[i]], root, L_);
         RobustPrune(1.0f, permutation[i], res);
-        for (auto &j: graph_[permutation[i]].candidates_) {
+        for (auto& j : graph_[permutation[i]].candidates_) {
             if (graph_[j.id].candidates_.size() + 1 > R_) {
                 graph_[j.id].candidates_.emplace_back(permutation[i], j.distance, false);
                 RobustPrune(alpha_, j.id, graph_[j.id].candidates_);

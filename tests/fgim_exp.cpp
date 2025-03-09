@@ -13,7 +13,7 @@
 #include "vamana.h"
 
 void
-test_nndescent(DatasetPtr &dataset) {
+test_nndescent(DatasetPtr& dataset) {
     nndescent::NNDescent nndescent(dataset, 20);
 
     nndescent.build();
@@ -22,7 +22,7 @@ test_nndescent(DatasetPtr &dataset) {
 }
 
 void
-test_vamana(DatasetPtr &dataset) {
+test_vamana(DatasetPtr& dataset) {
     diskann::Vamana vamana(dataset, 1.2, 100, 80);
 
     vamana.build();
@@ -31,7 +31,7 @@ test_vamana(DatasetPtr &dataset) {
 }
 
 void
-test_taumng(DatasetPtr &dataset) {
+test_taumng(DatasetPtr& dataset) {
     nndescent::NNDescent nndescent(dataset, 20);
 
     nndescent.build();
@@ -46,7 +46,7 @@ test_taumng(DatasetPtr &dataset) {
 }
 
 void
-test_nsw(DatasetPtr &dataset) {
+test_nsw(DatasetPtr& dataset) {
     nsw::NSW nsw(dataset, 32, 100);
 
     nsw.build();
@@ -55,7 +55,7 @@ test_nsw(DatasetPtr &dataset) {
 }
 
 void
-test_hnsw(DatasetPtr &dataset) {
+test_hnsw(DatasetPtr& dataset) {
     hnsw::HNSW hnsw(dataset, 20, 200);
 
     hnsw.build();

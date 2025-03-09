@@ -1,16 +1,13 @@
 #include "shnsw.h"
 
-shnsw::SHNSW::SHNSW(DatasetPtr &dataset,
-                    int max_neighbors,
-                    int ef_construction,
-                    float radius)
-        : HNSW(dataset, max_neighbors, ef_construction), radius_(radius) {
+shnsw::SHNSW::SHNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction, float radius)
+    : HNSW(dataset, max_neighbors, ef_construction), radius_(radius) {
 }
 
 void
 shnsw::SHNSW::addPoint(unsigned int index) {
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    auto level = (int) (-log(distribution(random_engine_)) * reverse_);
+    auto level = (int)(-log(distribution(random_engine_)) * reverse_);
     int cur_max_level_ = graph_.size() - 1;
 
     unsigned cur_node_ = enter_point_;
@@ -23,9 +20,9 @@ shnsw::SHNSW::addPoint(unsigned int index) {
     float min_dist_ = std::numeric_limits<float>::max();
 
     for (auto i = std::min(level, cur_max_level_); i >= 0; --i) {
-        Graph &graph = graph_[i];
+        Graph& graph = graph_[i];
         auto res =
-                searchLayer(graph, (*oracle_)[index], ef_construction_, ef_construction_, cur_node_);
+            searchLayer(graph, (*oracle_)[index], ef_construction_, ef_construction_, cur_node_);
         auto pos = seekPos(res);
         resset.emplace_back(res.begin(), res.begin() + pos);
         cur_node_ = res[0].id;
@@ -45,9 +42,9 @@ shnsw::SHNSW::addPoint(unsigned int index) {
 
     int idx = 0;
     for (auto i = std::min(level, cur_max_level_); i >= 0; --i) {
-        Graph &graph = graph_[i];
+        Graph& graph = graph_[i];
 
-        auto &candidates = graph[index].candidates_;
+        auto& candidates = graph[index].candidates_;
         auto res = resset[idx++];
 
         auto cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
@@ -70,7 +67,7 @@ shnsw::SHNSW::addPoint(unsigned int index) {
         }
         std::vector<Neighbor>().swap(res);
 
-        for (auto &e: candidates) {
+        for (auto& e : candidates) {
             if (graph[e.id].candidates_.size() < max_neighbors_) {
                 graph[e.id].addNeighbor(Neighbor(index, e.distance, false));
             } else {
@@ -116,9 +113,7 @@ shnsw::SHNSW::addPoint(unsigned int index) {
 //}
 
 Neighbors
-shnsw::SHNSW::search(const float *query,
-                     unsigned int topk,
-                     unsigned int L) const {
+shnsw::SHNSW::search(const float* query, unsigned int topk, unsigned int L) const {
     unsigned cur_node_ = enter_point_;
     for (auto i = graph_.size() - 1; i > 0; --i) {
         auto res = searchLayer(graph_[i], query, 1, 1, cur_node_);
@@ -137,8 +132,8 @@ shnsw::SHNSW::build_internal() {
     families_.resize(total);
     graph_.emplace_back(total);
 
-    Graph &base = graph_.back();
-    for (auto &u: base) {
+    Graph& base = graph_.back();
+    for (auto& u : base) {
         u.candidates_.reserve(max_base_neighbors_);
     }
 

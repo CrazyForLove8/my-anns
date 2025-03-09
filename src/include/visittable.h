@@ -5,58 +5,57 @@
 #ifndef MYANNS_VISITTABLE_H
 #define MYANNS_VISITTABLE_H
 
-#include "logger.h"
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <memory>
-#include <deque>
 #include <mutex>
+
+#include "logger.h"
 
 using namespace graph;
 
 namespace graph {
 
-    class VisitedList {
-    public:
-        unsigned short version_;
-        unsigned short *block_;
-        size_t size_;
+class VisitedList {
+public:
+    unsigned short version_;
+    unsigned short* block_;
+    size_t size_;
 
-        explicit VisitedList(size_t num);
+    explicit VisitedList(size_t num);
 
-        void
-        reset();
+    void
+    reset();
 
-        ~VisitedList();
-    };
+    ~VisitedList();
+};
 
-    using VisitedListPtr = std::shared_ptr<VisitedList>;
+using VisitedListPtr = std::shared_ptr<VisitedList>;
 
-    class VisitedListPool {
-    private:
-        size_t num_;
+class VisitedListPool {
+private:
+    size_t num_;
 
-        std::deque<VisitedListPtr> pool_;
+    std::deque<VisitedListPtr> pool_;
 
-        std::mutex guard_;
+    std::mutex guard_;
 
+public:
+    VisitedListPool();
 
-    public:
-        VisitedListPool();
+    static std::shared_ptr<VisitedListPool>
+    getInstance(size_t num);
 
-        static std::shared_ptr<VisitedListPool>
-        getInstance(size_t num);
+    VisitedListPtr
+    getFreeVisitedList();
 
-        VisitedListPtr
-        getFreeVisitedList();
+    void
+    releaseVisitedList(const VisitedListPtr& ptr);
+};
 
-        void
-        releaseVisitedList(const VisitedListPtr &ptr);
-
-    };
-
-    using VisitedListPoolPtr = std::shared_ptr<VisitedListPool>;
+using VisitedListPoolPtr = std::shared_ptr<VisitedListPool>;
 
 }  // namespace graph
 

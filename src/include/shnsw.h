@@ -11,36 +11,31 @@ using namespace hnsw;
 
 namespace shnsw {
 
-    struct Family {
-        Neighbors children_;
-    };
+struct Family {
+    Neighbors children_;
+};
 
-    using FamilyMap = std::vector<Family>;
+using FamilyMap = std::vector<Family>;
 
-    class SHNSW : public HNSW {
-    private:
-        float radius_;
+class SHNSW : public HNSW {
+private:
+    float radius_;
 
-        FamilyMap families_;
+    FamilyMap families_;
 
-        void
-        build_internal() override;
+    void
+    build_internal() override;
 
-    protected:
-        void
-        addPoint(unsigned index) override;
+protected:
+    void
+    addPoint(unsigned index) override;
 
-    public:
-        SHNSW(DatasetPtr &dataset,
-              int max_neighbors,
-              int ef_construction,
-              float radius);
+public:
+    SHNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction, float radius);
 
-        Neighbors
-        search(const float *query,
-               unsigned int topk,
-               unsigned int L) const override;
-    };
+    Neighbors
+    search(const float* query, unsigned int topk, unsigned int L) const override;
+};
 
 }  // namespace shnsw
 

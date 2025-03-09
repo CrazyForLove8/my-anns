@@ -6,30 +6,31 @@
 
 #define MULTI_THREAD 1
 
-void testCombine() {
+void
+testCombine() {
     auto dataset = Dataset::getInstance("sift", "1m");
     auto datasets = std::vector<DatasetPtr>();
-//    auto nnd = std::make_shared<nndescent::NNDescent>(dataset, 20);
-//    nnd->build();
-//    eval(nnd, dataset, 200);
+    //    auto nnd = std::make_shared<nndescent::NNDescent>(dataset, 20);
+    //    nnd->build();
+    //    eval(nnd, dataset, 200);
 
     dataset->split(datasets, 2);
     datasets.insert(datasets.begin(), dataset);
 
     auto nnd1 = std::make_shared<nndescent::NNDescent>(datasets[0], 20);
     auto nnd2 = std::make_shared<nndescent::NNDescent>(datasets[1], 20);
-//    auto nnd3 = std::make_shared<nndescent::NNDescent>(datasets[2], 40);
-//    auto nnd4 = std::make_shared<nndescent::NNDescent>(datasets[3], 40);
-//    auto nnd5 = std::make_shared<nndescent::NNDescent>(datasets[4], 40);
+    //    auto nnd3 = std::make_shared<nndescent::NNDescent>(datasets[2], 40);
+    //    auto nnd4 = std::make_shared<nndescent::NNDescent>(datasets[3], 40);
+    //    auto nnd5 = std::make_shared<nndescent::NNDescent>(datasets[4], 40);
 
     nnd1->build();
     nnd2->build();
-//    nnd3->build();
-//    nnd4->build();
-//    nnd5->build();
+    //    nnd3->build();
+    //    nnd4->build();
+    //    nnd5->build();
 
     std::vector<IndexPtr> indexes = {nnd1, nnd2};
-//    std::vector<IndexPtr> indexes = {nnd1, nnd2, nnd3, nnd4, nnd5};
+    //    std::vector<IndexPtr> indexes = {nnd1, nnd2, nnd3, nnd4, nnd5};
 
     FGIM m(20);
 
@@ -38,7 +39,8 @@ void testCombine() {
     eval(m, dataset, 200);
 }
 
-void testMerge() {
+void
+testMerge() {
     auto dataset = Dataset::getInstance("sift", "100k");
     auto datasets = std::vector<DatasetPtr>();
     dataset->split(datasets, 3);
@@ -62,12 +64,12 @@ void testMerge() {
     FGIM m(20);
 }
 
-int main() {
+int
+main() {
 #if not MULTI_THREAD
     omp_set_num_threads(1);
 #endif
     Log::setVerbose(true);
 
     testCombine();
-
 }

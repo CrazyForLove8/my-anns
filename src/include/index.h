@@ -6,15 +6,17 @@
 #define MYANNS_INDEX_H
 
 #include <omp.h>
+
 #include <random>
 #include <unordered_set>
+
+#include "dataset.h"
 #include "dtype.h"
 #include "graph.h"
 #include "logger.h"
 #include "metric.h"
 #include "timer.h"
 #include "visittable.h"
-#include "dataset.h"
 
 using namespace graph;
 
@@ -40,13 +42,12 @@ protected:
 public:
     Index();
 
-    explicit Index(DatasetPtr &dataset,
-                   bool allocate = true);
+    explicit Index(DatasetPtr& dataset, bool allocate = true);
 
     virtual ~Index() = default;
 
     virtual void
-    reset(DatasetPtr &dataset);
+    reset(DatasetPtr& dataset);
 
     virtual void
     build();
@@ -56,12 +57,12 @@ public:
      * @param dataset
      */
     virtual void
-    add(DatasetPtr &dataset);
+    add(DatasetPtr& dataset);
 
-    virtual Graph &
+    virtual Graph&
     extractGraph();
 
-    virtual DatasetPtr &
+    virtual DatasetPtr&
     extractDataset();
 
     /**
@@ -72,9 +73,7 @@ public:
      * @return
      */
     virtual Neighbors
-    search(const float *query,
-           unsigned int topk,
-           unsigned int L) const;
+    search(const float* query, unsigned int topk, unsigned int L) const;
 };
 
 using IndexPtr = std::shared_ptr<Index>;

@@ -5,12 +5,13 @@
 #include "visittable.h"
 
 graph::VisitedList::VisitedList(size_t num)
-        : size_(num), version_(-1), block_(new unsigned short[num]) {
+    : size_(num), version_(-1), block_(new unsigned short[num]) {
 }
 
-void graph::VisitedList::reset() {
+void
+graph::VisitedList::reset() {
     if (not block_) {
-        block_ = (unsigned short *) malloc(size_ * sizeof(unsigned short));
+        block_ = (unsigned short*)malloc(size_ * sizeof(unsigned short));
     }
     version_++;
     if (version_ == 0 || version_ >= std::numeric_limits<unsigned short>::max() - 1) {
@@ -26,14 +27,15 @@ graph::VisitedList::~VisitedList() {
 graph::VisitedListPool::VisitedListPool() : num_(0) {
 }
 
-std::shared_ptr<VisitedListPool> graph::VisitedListPool::getInstance(size_t num) {
+std::shared_ptr<VisitedListPool>
+graph::VisitedListPool::getInstance(size_t num) {
     auto ptr = std::make_shared<VisitedListPool>();
     ptr->num_ = num;
     return ptr;
 }
 
-
-graph::VisitedListPtr graph::VisitedListPool::getFreeVisitedList() {
+graph::VisitedListPtr
+graph::VisitedListPool::getFreeVisitedList() {
     VisitedListPtr ptr;
     {
         std::unique_lock<std::mutex> lock(guard_);
@@ -48,7 +50,8 @@ graph::VisitedListPtr graph::VisitedListPool::getFreeVisitedList() {
     return ptr;
 }
 
-void graph::VisitedListPool::releaseVisitedList(const VisitedListPtr &ptr) {
+void
+graph::VisitedListPool::releaseVisitedList(const VisitedListPtr& ptr) {
     std::unique_lock<std::mutex> lock(guard_);
     pool_.push_back(ptr);
 }
