@@ -5,13 +5,17 @@ using namespace graph;
 hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
     : max_neighbors_(max_neighbors),
       max_level_(0),
+      enter_point_(0),
+      cur_max_level_(0),
       max_base_neighbors_(max_neighbors * 2),
       ef_construction_(ef_construction),
       Index(dataset, false) {
     visited_table_ = std::unordered_set<int>();
     random_engine_.seed(2024);
-    enter_point_ = 0;
     reverse_ = 1 / log(1.0 * max_neighbors_);
+
+    levels.reserve(oracle_->size());
+    levels.resize(oracle_->size(), 0);
 }
 
 int
@@ -86,51 +90,55 @@ hnsw::HNSW::seekPos(const Neighbors& vec) {
 
 void
 hnsw::HNSW::addPoint(unsigned int index) {
-    // TODO Levels can be computed before adding the point so that we can avoid enlarging the graph in the loop
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    auto level = (int)(-log(distribution(random_engine_)) * reverse_);
-    int cur_max_level_ = graph_.size() - 1;
+    std::lock_guard<std::mutex> guard(graph_[0][index].lock_);
+
+    int level = levels[index];
+    std::unique_lock<std::mutex> graph_lock(graph_lock_);
+    int max_level_copy = cur_max_level_;
+    if (level <= max_level_copy) {
+        graph_lock.unlock();
+    }
 
     uint32_t cur_node_ = enter_point_;
-    for (auto i = cur_max_level_; i > level; --i) {
-        //        auto res = searchLayer(hnsw_graph[i], oracle, oracle[index],
-        //        cur_node_, 1);
-        auto res = knn_search(
-            oracle_.get(), visited_list_pool_.get(), graph_[i], (*oracle_)[index], 1, 1, cur_node_);
+    for (auto i = max_level_copy; i > level; --i) {
+        auto res = search_layer(
+            oracle_.get(), visited_list_pool_.get(), graph_, i, (*oracle_)[index], 1, 1, cur_node_);
         cur_node_ = res[0].id;
     }
 
-    for (auto i = std::min(level, cur_max_level_); i >= 0; --i) {
-        Graph& graph = graph_[i];
+    for (auto i = std::min(level, max_level_copy); i >= 0; --i) {
+        auto res = search_layer(oracle_.get(),
+                                visited_list_pool_.get(),
+                                graph_,
+                                i,
+                                (*oracle_)[index],
+                                ef_construction_,
+                                ef_construction_,
+                                cur_node_);
+
+        res.erase(std::remove_if(
+                      res.begin(), res.end(), [index](const Neighbor& n) { return n.id == index; }),
+                  res.end());
+        res.erase(std::unique(res.begin(), res.end()), res.end());
+
+        auto& graph = graph_[i];
         auto& candidates = graph[index].candidates_;
-        //        auto res = searchLayer(graph, oracle, oracle[index], cur_node_,
-        //        ef_construction_);
-        auto res = knn_search(oracle_.get(),
-                              visited_list_pool_.get(),
-                              graph,
-                              (*oracle_)[index],
-                              ef_construction_,
-                              ef_construction_,
-                              cur_node_);
+        auto cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
+        prune(res, cur_max_cnt);
 
         candidates.swap(res);
-        auto cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
-        prune(candidates, cur_max_cnt);
 
         for (auto& e : candidates) {
+            std::lock_guard<std::mutex> lock(graph_[0][e.id].lock_);
             graph[e.id].addNeighbor(Neighbor(index, e.distance, false));
             prune(graph[e.id].candidates_, cur_max_cnt);
         }
         cur_node_ = candidates[0].id;
     }
 
-    while (level > cur_max_level_) {
-        graph_.emplace_back(oracle_->size());
+    if (level > max_level_copy) {
         enter_point_ = index;
-        ++cur_max_level_;
-    }
-    if (max_level_ < level) {
-        max_level_ = level;
+        cur_max_level_ = level;
     }
 }
 
@@ -313,16 +321,33 @@ hnsw::HNSW::extractGraph() {
 
 HGraph&
 hnsw::HNSW::extractHGraph() {
+    if (!built_) {
+        throw std::runtime_error("Index is not built yet");
+    }
     return graph_;
 }
 
 void
 hnsw::HNSW::build_internal() {
-    HGraph().swap(graph_);
+    logger << "Building HNSW index with parameters:" << std::endl;
+    logger << "max_neighbors: " << max_neighbors_ << std::endl;
+    logger << "ef_construction: " << ef_construction_ << std::endl;
+    logger << "dataset size: " << oracle_->size() << std::endl;
 
     int total = oracle_->size();
-    graph_.emplace_back(total);
 
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    for (int i = 0; i < total; i++) {
+        levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels[i]);
+    }
+
+    graph_.reserve(max_level_ + 1);
+    for (int i = 0; i <= max_level_; ++i) {
+        graph_.emplace_back(total);
+    }
+
+#pragma omp parallel for schedule(dynamic)
     for (int i = 1; i < total; ++i) {
         if (i % 10000 == 0) {
             logger << "Adding " << i << " / " << total << std::endl;
@@ -351,19 +376,26 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
         throw std::runtime_error("Index is not built yet");
     }
     built_ = false;
+
+    Timer timer;
+    timer.start();
+
     auto cur_size = oracle_->size();
     auto total = dataset->getOracle()->size() + cur_size;
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    for (auto i = cur_size; i < total; i++) {
+        levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels[i]);
+    }
+    graph_.resize(max_level_ + 1);
     for (auto& level : graph_) {
         level.resize(total);
     }
 
-    auto& cur_base = base_;
-    auto& new_base = dataset->getBase();
-    cur_base->append(new_base);
-    oracle_->reset(*cur_base);
-
-    Timer timer;
-    timer.start();
+    {
+        std::vector<DatasetPtr> datasets = {dataset};
+        dataset_->merge(datasets);
+    }
 
     for (int i = cur_size; i < total; ++i) {
         if (i % 10000 == 0) {

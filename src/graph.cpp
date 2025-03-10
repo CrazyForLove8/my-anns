@@ -111,7 +111,6 @@ Neighborhood::insert(int id, float dist) {
 
 void
 Neighborhood::addNeighbor(Neighbor nn) {
-    std::lock_guard<std::mutex> guard(lock_);
     auto it = std::lower_bound(candidates_.begin(), candidates_.end(), nn);
     if (it == candidates_.end() || it->id != nn.id) {
         candidates_.insert(it, nn);
@@ -276,7 +275,7 @@ graph::search(IndexOracle<float>* oracle,
 Neighbors
 graph::knn_search(IndexOracle<float>* oracle,
                   VisitedListPool* visited_list_pool,
-                  const Graph& graph,
+                  Graph& graph,
                   const float* query,
                   int topk,
                   int L,
@@ -314,6 +313,82 @@ graph::knn_search(IndexOracle<float>* oracle,
         if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
+            std::lock_guard<std::mutex> lock(graph[n].lock_);
+            for (const auto& candidate : graph[n].candidates_) {
+                auto id = candidate.id;
+#ifdef USE_SSE
+                _mm_prefetch(visit_array + id, _MM_HINT_T0);
+//                _mm_prefetch(&oracle[id], _MM_HINT_T0);
+#endif
+                if (visit_array[id] == visit_tag)
+                    continue;
+                visit_array[id] = visit_tag;
+                float dist = (*oracle)(id, query);
+                if (dist >= retset[L - 1].distance)
+                    continue;
+                Neighbor nn(id, dist, true);
+                int r = insert_into_pool(retset.data(), L, nn);
+                if (r < nk)
+                    nk = r;
+            }
+        }
+        if (nk <= k)
+            k = nk;
+        else
+            ++k;
+    }
+    int real_end = seekPos(retset);
+    retset.resize(std::min(topk, real_end));
+
+    visited_list_pool->releaseVisitedList(visit_pool_ptr);
+    return retset;
+}
+
+Neighbors
+graph::search_layer(IndexOracle<float>* oracle,
+                    VisitedListPool* visited_list_pool,
+                    HGraph& hgraph,
+                    int layer,
+                    const float* query,
+                    int topk,
+                    int L,
+                    size_t entry_id,
+                    size_t graph_sz) {
+    auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
+    auto visit_list = visit_pool_ptr.get();
+    unsigned short* visit_array = visit_list->block_;
+    unsigned short visit_tag = visit_list->version_;
+
+    auto& graph = hgraph[layer];
+
+    if (graph_sz == -1) {
+        graph_sz = graph.size();
+    }
+    Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
+    if (entry_id == -1) {
+        std::mt19937 rng(seed);
+        std::vector<int> init_ids;
+        init_ids.reserve(L);
+        init_ids.resize(L);
+        gen_random(rng, init_ids.data(), L, graph_sz);
+        for (int i = 0; i < L; i++) {
+            int id = init_ids[i];
+            float dist = (*oracle)(id, query);
+            retset[i] = Neighbor(id, dist, true);
+        }
+        std::sort(retset.begin(), retset.begin() + L);
+    } else {
+        auto dist = (*oracle)(entry_id, query);
+        retset[0] = Neighbor(entry_id, dist, true);
+    }
+
+    int k = 0;
+    while (k < L) {
+        int nk = L;
+        if (retset[k].flag) {
+            retset[k].flag = false;
+            auto n = retset[k].id;
+            std::lock_guard<std::mutex> lock(hgraph[0][n].lock_);
             for (const auto& candidate : graph[n].candidates_) {
                 auto id = candidate.id;
 #ifdef USE_SSE

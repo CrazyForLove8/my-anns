@@ -26,15 +26,21 @@ protected:
 
     uint32_t max_level_;
 
+    uint32_t cur_max_level_;
+
     uint32_t ef_construction_;
 
     uint32_t enter_point_;
+
+    std::vector<uint32_t> levels;
 
     double reverse_;
 
     std::unordered_set<int> visited_table_;
 
     std::default_random_engine random_engine_;
+
+    std::mutex graph_lock_;
 
     virtual void
     addPoint(unsigned index);
@@ -44,14 +50,14 @@ protected:
         const Graph& graph, const float* query, size_t topk, size_t L, size_t entry_id) const;
 
     /**
-                       * This implementation follows the original paper.
-                       * @param graph
-                       * @param oracle
-                       * @param query
-                       * @param enter_point
-                       * @param ef
-                       * @return
-                       */
+                           * This implementation follows the original paper.
+                           * @param graph
+                           * @param oracle
+                           * @param query
+                           * @param enter_point
+                           * @param ef
+                           * @return
+                           */
     Neighbors
     searchLayer(Graph& graph, IndexOracle<float>& oracle, float* query, int enter_point, int ef);
 

@@ -232,6 +232,16 @@ Dataset::getBasePtr() {
     return base_;
 }
 
+std::string&
+Dataset::getName() {
+    return name_;
+}
+
+std::string&
+Dataset::getSize() {
+    return size_;
+}
+
 std::vector<std::vector<unsigned int>>
 graph::loadGroundTruth(const std::string& filename, unsigned int qsize, unsigned int K) {
     std::ifstream input(filename, std::ios::binary);

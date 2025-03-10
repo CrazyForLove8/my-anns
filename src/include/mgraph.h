@@ -33,7 +33,7 @@ private:
     ReconstructHGraph();
 
     void
-    heuristic(Neighbors& candidates);
+    heuristic(Neighbors& candidates, unsigned max_degree);
 
 public:
     MGraph();

@@ -193,6 +193,13 @@ FGIM::update_neighbors(Graph& graph) {
 
 void
 FGIM::prune(Graph& graph) {
+    std::vector<int> indegree(graph.size(), 0);
+    for (auto& u : graph) {
+        for (auto& v : u.candidates_) {
+            indegree[v.id]++;
+        }
+    }
+
 #pragma omp parallel for schedule(dynamic)
     for (auto& u : graph) {
         auto& neighbors = u.candidates_;
@@ -200,7 +207,6 @@ FGIM::prune(Graph& graph) {
         {
             std::lock_guard<std::mutex> guard(u.lock_);
             candidates = neighbors;
-            neighbors.clear();
         }
         std::sort(candidates.begin(), candidates.end());
         candidates.erase(
@@ -210,22 +216,33 @@ FGIM::prune(Graph& graph) {
             candidates.end());
         for (auto&& v : candidates) {
             bool reserve = true;
-            for (auto& nn : _new_neighbors) {
-                if (nn.distance <= std::numeric_limits<float>::epsilon()) {
-                    continue;
-                }
-                auto dist = (*oracle_)(v.id, nn.id);
-                if (dist < v.distance) {
-                    {
-                        std::lock_guard<std::mutex> guard(graph[nn.id].lock_);
-                        graph[nn.id].candidates_.emplace_back(v.id, dist, true);
+            int inedge = 0;
+            {
+                std::lock_guard<std::mutex> guard(graph[v.id].lock_);
+                inedge = indegree[v.id];
+            }
+            if (inedge > 1) {
+                for (auto& nn : _new_neighbors) {
+                    if (nn.distance <= std::numeric_limits<float>::epsilon()) {
+                        continue;
                     }
-                    {
-                        std::lock_guard<std::mutex> guard(graph[v.id].lock_);
-                        graph[v.id].candidates_.emplace_back(nn.id, dist, true);
+                    auto dist = (*oracle_)(v.id, nn.id);
+                    if (dist < v.distance) {
+                        {
+                            std::lock_guard<std::mutex> lock(graph[v.id].lock_);
+                            indegree[v.id]--;
+                        }
+                        //                        {
+                        //                            std::lock_guard<std::mutex> guard(graph[nn.id].lock_);
+                        //                            graph[nn.id].candidates_.emplace_back(v.id, dist, true);
+                        //                        }
+                        //                        {
+                        //                            std::lock_guard<std::mutex> guard(graph[v.id].lock_);
+                        //                            graph[v.id].candidates_.emplace_back(nn.id, dist, true);
+                        //                        }
+                        reserve = false;
+                        break;
                     }
-                    reserve = false;
-                    break;
                 }
             }
             if (reserve) {
@@ -234,22 +251,26 @@ FGIM::prune(Graph& graph) {
         }
         {
             std::lock_guard<std::mutex> guard(u.lock_);
-            neighbors.insert(neighbors.end(), _new_neighbors.begin(), _new_neighbors.end());
+            neighbors.swap(_new_neighbors);
+            if (neighbors.size() > max_base_degree_) {
+                neighbors.resize(max_base_degree_);
+            }
         }
     }
-#pragma omp parallel for
-    for (auto& u : graph) {
-        auto& candidates = u.candidates_;
-        std::sort(candidates.begin(), candidates.end());
-        candidates.erase(
-            std::unique(candidates.begin(),
-                        candidates.end(),
-                        [](const Neighbor& a, const Neighbor& b) { return a.id == b.id; }),
-            candidates.end());
-        if (candidates.size() > max_base_degree_) {
-            candidates.resize(max_base_degree_);
-        }
-    }
+    //#pragma omp parallel for
+    //    for (auto &u: graph) {
+    //        auto &candidates = u.candidates_;
+    //        std::sort(candidates.begin(), candidates.end());
+    //        candidates.erase(
+    //                std::unique(candidates.begin(),
+    //                            candidates.end(),
+    //                            [](const Neighbor &a,
+    //                               const Neighbor &b) { return a.id == b.id; }),
+    //                candidates.end());
+    //        if (candidates.size() > max_base_degree_) {
+    //            candidates.resize(max_base_degree_);
+    //        }
+    //    }
 }
 
 void

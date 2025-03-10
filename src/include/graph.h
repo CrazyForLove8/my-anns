@@ -80,7 +80,7 @@ struct Neighborhood {
     std::vector<int> reverse_new_;
 
     int M_{std::numeric_limits<int>::max()};
-    float max_distance_{std::numeric_limits<float>::max()};
+    float max_distance_{std::numeric_limits<float>::min()};
 
     Neighborhood() = default;
 
@@ -100,9 +100,9 @@ struct Neighborhood {
     addNeighbor(Neighbor nn);
 
     /**
-         * @brief Move the content of the other neighborhood to this neighborhood. Note that only the candidates are moved.
-         * @param other
-         */
+             * @brief Move the content of the other neighborhood to this neighborhood. Note that only the candidates are moved.
+             * @param other
+             */
     void
     move(Neighborhood& other);
 };
@@ -191,12 +191,23 @@ insert_into_pool(Neighbor* addr, int size, Neighbor nn) {
 Neighbors
 knn_search(IndexOracle<float>* oracle,
            VisitedListPool* visited_list_pool,
-           const Graph& graph,
+           Graph& graph,
            const float* query,
            int topk,
            int L,
            size_t entry_id = -1,
            size_t graph_sz = -1);
+
+Neighbors
+search_layer(IndexOracle<float>* oracle,
+             VisitedListPool* visited_list_pool,
+             HGraph& hgraph,
+             int layer,
+             const float* query,
+             int topk,
+             int L,
+             size_t entry_id = -1,
+             size_t graph_sz = -1);
 
 Neighbors
 track_search(

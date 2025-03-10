@@ -53,6 +53,9 @@ Index::reset(DatasetPtr& dataset) {
 
 Graph&
 Index::extractGraph() {
+    if (!built_) {
+        throw std::runtime_error("Index is not built");
+    }
     return graph_;
 }
 

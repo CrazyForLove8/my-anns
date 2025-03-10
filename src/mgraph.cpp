@@ -83,6 +83,11 @@ MGraph::Refinement() {
     logger << "Iterative update time: " << timer.elapsed() << "s" << std::endl;
 
     timer.start();
+    connect_no_indegree(graph_[0]);
+    timer.end();
+    logger << "Connecting no indegree time: " << timer.elapsed() << "s" << std::endl;
+
+    timer.start();
     prune(graph_[0]);
     timer.end();
     logger << "Pruning time: " << timer.elapsed() << "s" << std::endl;
@@ -91,28 +96,21 @@ MGraph::Refinement() {
     add_reverse_edge(graph_[0]);
     timer.end();
     logger << "Adding reverse edge time: " << timer.elapsed() << "s" << std::endl;
-
-    timer.start();
-    prune(graph_[0]);
-    timer.end();
-    logger << "Pruning time: " << timer.elapsed() << "s" << std::endl;
-
-    timer.start();
-    connect_no_indegree(graph_[0]);
-    timer.end();
-    logger << "Connecting no indegree time: " << timer.elapsed() << "s" << std::endl;
 }
 
 void
-MGraph::heuristic(Neighbors& candidates) {
-    if (candidates.size() <= max_degree_) {
+MGraph::heuristic(Neighbors& candidates, unsigned max_degree) {
+    if (candidates.size() <= max_degree) {
         return;
     }
     Neighbors ret_set;
     for (auto& v : candidates) {
+        if (v.distance <= std::numeric_limits<float>::epsilon()) {
+            continue;
+        }
         bool prune = false;
         for (auto& w : ret_set) {
-            if ((*oracle_)(v.id, w.id) < v.distance) {
+            if ((v.id == w.id) || (*oracle_)(v.id, w.id) < v.distance) {
                 prune = true;
                 break;
             }
@@ -124,6 +122,7 @@ MGraph::heuristic(Neighbors& candidates) {
             break;
         }
     }
+    ret_set.erase(std::unique(ret_set.begin(), ret_set.end()), ret_set.end());
     candidates.swap(ret_set);
 }
 
@@ -159,11 +158,11 @@ MGraph::ReconstructHGraph() {
                                   cur_node_);
 
             candidates.swap(res);
-            heuristic(candidates);
+            heuristic(candidates, max_degree_);
 
             for (auto& e : candidates) {
                 graph[e.id].addNeighbor(Neighbor(u, e.distance, false));
-                heuristic(graph[e.id].candidates_);
+                heuristic(graph[e.id].candidates_, max_degree_);
             }
             cur_node_ = candidates[0].id;
         }

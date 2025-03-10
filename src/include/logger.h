@@ -27,9 +27,6 @@ private:
     static std::mutex mutex;
     static bool newLine;
 
-    static std::string
-    getTimestamp();
-
     template <typename T>
     bool
     containsNewline(const T& msg) {
@@ -64,33 +61,36 @@ public:
     operator<<(std::ostream& (*func)(std::ostream&));
 
     /**
-           * Set the verbose flag
-           * @param v A boolean value to set whether the output should be printed
-           */
+               * Set the verbose flag
+               * @param v A boolean value to set whether the output should be printed
+               */
     static void
     setVerbose(bool v) {
         verbose = v;
     }
 
     /**
-           * Set the directory to store the log files
-           * @param d A string to specify the directory
-           */
+               * Set the directory to store the log files
+               * @param d A string to specify the directory
+               */
     static void
     setDir(std::string d) {
         dir = std::move(d);
     }
 
     /**
-           * Redirect the output to a file
-           * @param filename A string to specify the filename, if empty, the default
-           * filename will be used. Note that the extension is default to be added as
-           * .txt
-           */
+               * Redirect the output to a file
+               * @param filename A string to specify the filename, if empty, the default
+               * filename will be used. Note that the extension is default to be added as
+               * .txt
+               */
     static void
     redirect(std::string filename = "");
 
     ~Log();
+
+    static std::string
+    getTimestamp();
 };
 
 static Log logger;

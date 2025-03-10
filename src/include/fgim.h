@@ -47,7 +47,7 @@ protected:
     connect_no_indegree(Graph& graph);
 
 public:
-    static constexpr unsigned ITER_MAX = 100;
+    static constexpr unsigned ITER_MAX = 30;
 
     static constexpr unsigned SAMPLES = 100;
 

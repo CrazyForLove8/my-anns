@@ -4,17 +4,10 @@ using namespace hnsw;
 
 void
 testBuild() {
-    auto dataset = Dataset::getInstance("sift", "1m");
+    auto dataset = Dataset::getInstance("gist", "1m");
     auto index = std::make_shared<HNSW>(dataset, 20, 200);
     index->build();
     eval(index, dataset, 200);
-
-    // 100k
-    // L: 200 recall: 0.9995 qps: 4609.67
-
-    // L: 200 recall: 0.9995 qps: 4948.73
-
-    // L: 200 recall: 0.9995 qps: 5183.3
 }
 
 void

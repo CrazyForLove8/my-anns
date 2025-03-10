@@ -77,24 +77,9 @@ graph::eval(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             unsigned search_L,
             unsigned K,
             unsigned runs) {
-    if (std::holds_alternative<IndexPtr>(index)) {
-        auto ptr = std::get<IndexPtr>(index);
-        if (!ptr) {
-            throw std::runtime_error("IndexPtr in variant is null!");
-        }
-    } else if (std::holds_alternative<std::reference_wrapper<Index>>(index)) {
-        auto& ref = std::get<std::reference_wrapper<Index>>(index).get();
-        if (&ref == nullptr) {
-            throw std::runtime_error("Reference in variant is null!");
-        }
-    } else {
-        throw std::runtime_error("Variant does not hold a valid Index!");
-    }
-
     std::vector<unsigned> search_Ls;
     if (search_L == -1) {
-        search_Ls = {
-            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+        search_Ls = {20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800};
     } else {
         search_Ls = {search_L};
     }
