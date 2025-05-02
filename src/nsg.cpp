@@ -1,6 +1,7 @@
 #include "nsg.h"
 
-nsg::NSG::NSG(DatasetPtr& dataset, unsigned int L, unsigned int m) : Index(dataset), L_(L), m_(m) {
+nsg::NSG::NSG(DatasetPtr& dataset, unsigned int K, unsigned int L, unsigned int m)
+    : Index(dataset), L_(L), m_(m), K_(K) {
 }
 
 //void
@@ -31,6 +32,7 @@ nsg::NSG::NSG(DatasetPtr& dataset, unsigned int L, unsigned int m) : Index(datas
 //    tree();
 //}
 
+//TODO Extract pruning strategy to a separate class like metrics
 std::vector<Neighbor>
 nsg::NSG::prune(std::vector<Neighbor>& candidates) {
     std::vector<Neighbor> prunedNeighbors;
@@ -58,7 +60,7 @@ nsg::NSG::tree() {
    * TODO Here needs to be fixed
    * Too many recursion
    */
-    auto dfs = [&](int start, const Graph& g, std::vector<bool>& visited) {
+    auto dfs = [](int start, const Graph& g, std::vector<bool>& visited) {
         std::stack<int> s;
         s.push(start);
         visited[start] = true;
@@ -74,69 +76,96 @@ nsg::NSG::tree() {
             }
         }
     };
-    std::vector<bool> visited(graph_.size(), false);
+
+    std::vector<bool> visited(oracle_->size(), false);
     bool built = false;
     while (!built) {
+        std::fill(visited.begin(), visited.end(), false);
         dfs(root, graph_, visited);
         built = true;
-        for (int i = 0; i < graph_.size(); ++i) {
-            if (!visited[i]) {
-                built = false;
-                auto candidates = track_search(oracle_.get(), graph_, (*oracle_)[i], root, L_);
-                bool added = false;
-                int idx = 0;
-                for (auto&& candidate : candidates) {
-                    if (!visited[candidate.id]) {
-                        continue;
-                    }
-                    graph_[candidate.id].addNeighbor(Neighbor(i, candidate.distance, true));
-                    added = true;
-                    logger << candidate.id << " " << i << std::endl;
-                    break;
+        for (int i = 0; i < oracle_->size(); ++i) {
+            if (visited[i]) {
+                continue;
+            }
+            built = false;
+            auto candidates = track_search(
+                oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[i], L_, root);
+            bool added = false;
+            int idx = 0;
+            for (auto& candidate : candidates) {
+                if (graph_[candidate.id].candidates_.size() >= m_) {
+                    continue;
                 }
-
-                if (!added) {
-                    std::mt19937 rng(2024);
-                    do {
-                        idx = rng() % graph_.size();
-                        if (visited[idx]) {
-                            graph_[idx].addNeighbor(Neighbor(i, (*oracle_)(idx, i), true));
-                            added = true;
-                            logger << idx << " " << i << std::endl;
-                        }
-                    } while (!added);
-                }
+                graph_[candidate.id].addNeighbor(Neighbor(i, candidate.distance, true));
+                added = true;
+                logger << candidate.id << " " << i << std::endl;
                 break;
             }
+
+            if (!added) {
+                std::mt19937 rng(2024);
+                do {
+                    idx = rng() % graph_.size();
+                    if (visited[idx]) {
+                        graph_[idx].addNeighbor(Neighbor(i, (*oracle_)(idx, i), true));
+                        added = true;
+                        logger << idx << " " << i << std::endl;
+                    }
+                } while (!added);
+            }
+            break;
         }
-        std::fill(visited.begin(), visited.end(), false);
     }
 }
 
 void
 nsg::NSG::build_internal() {
-    auto* center = new float[oracle_->dim()];
-    for (unsigned i = 0; i < oracle_->size(); ++i) {
-        auto pt = (*oracle_)[i];
-        for (unsigned j = 0; j < oracle_->dim(); ++j) {
-            center[j] += pt[j];
+    {
+        nndescent::NNDescent nnd(dataset_, K_);
+        nnd.build();
+        graph_ = std::move(nnd.extractGraph());
+    }
+
+    {
+        auto* center = new float[oracle_->dim()];
+        for (unsigned i = 0; i < oracle_->size(); ++i) {
+            auto pt = (*oracle_)[i];
+            for (unsigned j = 0; j < oracle_->dim(); ++j) {
+                center[j] += pt[j];
+            }
         }
+        for (unsigned i = 0; i < oracle_->dim(); ++i) {
+            center[i] /= oracle_->size();
+        }
+        root = knn_search(oracle_.get(), visited_list_pool_.get(), graph_, center, 1, L_)[0].id;
+        delete[] center;
     }
-    for (unsigned i = 0; i < oracle_->dim(); ++i) {
-        center[i] /= oracle_->size();
-    }
-    root = knn_search(oracle_.get(), visited_list_pool_.get(), graph_, center, 1, L_)[0].id;
-    delete center;
+
     logger << "Root: " << root << std::endl;
 
+#pragma omp parallel for schedule(dynamic)
     for (int u = 0; u < graph_.size(); ++u) {
         if (u % 10000 == 0) {
             logger << "Adding " << u << " / " << graph_.size() << std::endl;
         }
         std::vector<Neighbor> candidates =
-            track_search(oracle_.get(), graph_, (*oracle_)[u], root, L_);
-        graph_[u].candidates_ = prune(candidates);
+            track_search(oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u], L_, root);
+        candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+        candidates.erase(
+            std::remove_if(
+                candidates.begin(), candidates.end(), [u](const Neighbor& n) { return n.id == u; }),
+            candidates.end());
+        {
+            std::lock_guard<std::mutex> guard(graph_[u].lock_);
+            graph_[u].candidates_ = prune(candidates);
+        }
     }
 
-    tree();
+    //    tree();
+}
+
+Neighbors
+nsg::NSG::search(const float* query, unsigned int topk, unsigned int L) const {
+    return graph::search(
+        oracle_.get(), visited_list_pool_.get(), flatten_graph_, query, topk, L, root);
 }

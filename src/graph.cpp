@@ -35,9 +35,10 @@ Neighbor::operator=(const Neighbor& other) {
     return *this;
 }
 
-Neighborhood::Neighborhood(int M) {
-    M_ = M;
-    candidates_.reserve(M_);
+Neighbor::Neighbor(const Neighbor& other) {
+    id = other.id;
+    distance = other.distance;
+    flag = other.flag;
 }
 
 Neighborhood::Neighborhood(int s, std::mt19937& rng, int N) {
@@ -90,7 +91,7 @@ Neighborhood::Neighborhood(const Neighborhood& other) {
 }
 
 unsigned
-Neighborhood::insert(int id, float dist) {
+Neighborhood::pushHeap(int id, float dist) {
     std::lock_guard<std::mutex> guard(lock_);
     if (!candidates_.empty() && dist >= candidates_.front().distance)
         return 0;
@@ -110,14 +111,17 @@ Neighborhood::insert(int id, float dist) {
 }
 
 void
-Neighborhood::addNeighbor(Neighbor nn) {
+Neighborhood::addNeighbor(Neighbor nn, int capacity) {
     auto it = std::lower_bound(candidates_.begin(), candidates_.end(), nn);
+    if (nn.distance >= greatest_distance)
+        return;
     if (it == candidates_.end() || it->id != nn.id) {
         candidates_.insert(it, nn);
     }
-    if (candidates_.size() > M_) {
+    if (capacity > 0 && candidates_.size() > capacity) {
         candidates_.pop_back();
     }
+    greatest_distance = candidates_.back().distance;
 }
 
 void
@@ -203,8 +207,8 @@ graph::search(IndexOracle<float>* oracle,
               int K0) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
-    unsigned short* visit_array = visit_list->block_;
-    unsigned short visit_tag = visit_list->version_;
+    auto* visit_array = visit_list->block_;
+    auto visit_tag = visit_list->version_;
 
     const std::vector<int>& offsets = fg.offsets;
     const std::vector<int>& final_graph = fg.final_graph;
@@ -279,29 +283,30 @@ graph::knn_search(IndexOracle<float>* oracle,
                   const float* query,
                   int topk,
                   int L,
-                  size_t entry_id,
-                  size_t graph_sz) {
+                  int entry_id,
+                  int graph_sz) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
-    unsigned short* visit_array = visit_list->block_;
-    unsigned short visit_tag = visit_list->version_;
+    auto* visit_array = visit_list->block_;
+    auto visit_tag = visit_list->version_;
 
-    if (graph_sz == -1) {
-        graph_sz = graph.size();
-    }
     Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
     if (entry_id == -1) {
+        if (graph_sz == -1) {
+            graph_sz = graph.size();
+        }
         std::mt19937 rng(seed);
         std::vector<int> init_ids;
-        init_ids.reserve(L);
-        init_ids.resize(L);
-        gen_random(rng, init_ids.data(), L, graph_sz);
-        for (int i = 0; i < L; i++) {
+        int generate_size = std::min(graph_sz, L);
+        init_ids.reserve(generate_size);
+        init_ids.resize(generate_size);
+        gen_random(rng, init_ids.data(), generate_size, graph_sz);
+        for (int i = 0; i < generate_size; i++) {
             int id = init_ids[i];
             float dist = (*oracle)(id, query);
             retset[i] = Neighbor(id, dist, true);
         }
-        std::sort(retset.begin(), retset.begin() + L);
+        std::sort(retset.begin(), retset.begin() + generate_size);
     } else {
         auto dist = (*oracle)(entry_id, query);
         retset[0] = Neighbor(entry_id, dist, true);
@@ -313,7 +318,7 @@ graph::knn_search(IndexOracle<float>* oracle,
         if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
-            std::lock_guard<std::mutex> lock(graph[n].lock_);
+            std::lock_guard<std::mutex> guard(graph[n].lock_);
             for (const auto& candidate : graph[n].candidates_) {
                 auto id = candidate.id;
 #ifdef USE_SSE
@@ -352,35 +357,15 @@ graph::search_layer(IndexOracle<float>* oracle,
                     const float* query,
                     int topk,
                     int L,
-                    size_t entry_id,
-                    size_t graph_sz) {
+                    int entry_id) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
-    unsigned short* visit_array = visit_list->block_;
-    unsigned short visit_tag = visit_list->version_;
-
+    auto* visit_array = visit_list->block_;
+    auto visit_tag = visit_list->version_;
     auto& graph = hgraph[layer];
-
-    if (graph_sz == -1) {
-        graph_sz = graph.size();
-    }
     Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
-    if (entry_id == -1) {
-        std::mt19937 rng(seed);
-        std::vector<int> init_ids;
-        init_ids.reserve(L);
-        init_ids.resize(L);
-        gen_random(rng, init_ids.data(), L, graph_sz);
-        for (int i = 0; i < L; i++) {
-            int id = init_ids[i];
-            float dist = (*oracle)(id, query);
-            retset[i] = Neighbor(id, dist, true);
-        }
-        std::sort(retset.begin(), retset.begin() + L);
-    } else {
-        auto dist = (*oracle)(entry_id, query);
-        retset[0] = Neighbor(entry_id, dist, true);
-    }
+    auto dist = (*oracle)(entry_id, query);
+    retset[0] = Neighbor(entry_id, dist, true);
 
     int k = 0;
     while (k < L) {
@@ -398,7 +383,7 @@ graph::search_layer(IndexOracle<float>* oracle,
                 if (visit_array[id] == visit_tag)
                     continue;
                 visit_array[id] = visit_tag;
-                float dist = (*oracle)(id, query);
+                dist = (*oracle)(id, query);
                 if (dist >= retset[L - 1].distance)
                     continue;
                 Neighbor nn(id, dist, true);
@@ -407,10 +392,11 @@ graph::search_layer(IndexOracle<float>* oracle,
                     nk = r;
             }
         }
-        if (nk <= k)
+        if (nk <= k) {
             k = nk;
-        else
+        } else {
             ++k;
+        }
     }
     int real_end = seekPos(retset);
     retset.resize(std::min(topk, real_end));
@@ -420,57 +406,136 @@ graph::search_layer(IndexOracle<float>* oracle,
 }
 
 Neighbors
-graph::track_search(
-    IndexOracle<float>* oracle, const Graph& graph, const float* query, int entry_id, int L) {
-    std::vector<bool> visited(graph.size(), false);
+graph::track_search(IndexOracle<float>* oracle,
+                    VisitedListPool* visited_list_pool,
+                    Graph& graph,
+                    const float* query,
+                    int L,
+                    int entry_id) {
+    auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
+    auto visit_list = visit_pool_ptr.get();
+    auto* visit_array = visit_list->block_;
+    auto visit_tag = visit_list->version_;
+
     Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
+    Neighbors track;
     auto dist = (*oracle)(entry_id, query);
     retset[0] = Neighbor(entry_id, dist, true);
-    Neighbors track_pool;
-    track_pool.emplace_back(entry_id, dist, true);
+    track.emplace_back(entry_id, dist, true);
+
     int k = 0;
     while (k < L) {
         int nk = L;
         if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
+            std::lock_guard<std::mutex> lock(graph[n].lock_);
             for (const auto& candidate : graph[n].candidates_) {
                 auto id = candidate.id;
-                if (visited[id])
+#ifdef USE_SSE
+                _mm_prefetch(visit_array + id, _MM_HINT_T0);
+//                _mm_prefetch(&oracle[id], _MM_HINT_T0);
+#endif
+                if (visit_array[id] == visit_tag)
                     continue;
-                visited[id] = true;
+                visit_array[id] = visit_tag;
                 dist = (*oracle)(id, query);
                 if (dist >= retset[L - 1].distance)
                     continue;
                 Neighbor nn(id, dist, true);
                 int r = insert_into_pool(retset.data(), L, nn);
-                track_pool.emplace_back(id, dist, true);
+                track.emplace_back(id, dist, true);
                 if (r < nk)
                     nk = r;
             }
         }
-        if (nk <= k)
+        if (nk <= k) {
             k = nk;
-        else
+        } else {
             ++k;
+        }
     }
-    std::sort(track_pool.begin(), track_pool.end());
-    return track_pool;
-};
+
+    visited_list_pool->releaseVisitedList(visit_pool_ptr);
+    std::sort(track.begin(), track.end());
+    return track;
+}
+
+std::string graph_output_dir = "/root/code/algotests/myanns/outputs/";
 
 void
 graph::saveGraph(Graph& graph, const std::string& filename) {
-    std::ofstream file(filename);
+    if (graph.empty()) {
+        return;
+    }
+    std::ofstream file(graph_output_dir + filename);
     file << std::fixed;
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open the file");
     }
+    std::ifstream checkFile(graph_output_dir + filename, std::ios::ate);
+    if (checkFile && checkFile.tellg() != 0) {
+        file.close();
+        std::mt19937 rng(seed);
+        std::string new_filename = filename + "_" + std::to_string(rng());
+        file = std::ofstream(graph_output_dir + new_filename);
+    }
+    checkFile.close();
+
     file << graph.size() << std::endl;
     for (size_t i = 0; i < graph.size(); ++i) {
         std::sort(graph[i].candidates_.begin(), graph[i].candidates_.end());
         file << i << " " << graph[i].candidates_.size() << std::endl;
         for (auto& neighbor : graph[i].candidates_) {
-            file << neighbor.id << " " << neighbor.distance << " ";
+            file << neighbor.id << " ";
+        }
+        file << std::endl;
+    }
+
+    file.close();
+}
+
+void
+graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
+    if (hgraph.empty()) {
+        return;
+    }
+    std::ofstream file(graph_output_dir + filename);
+    file << std::fixed;
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open the file");
+    }
+    std::ifstream checkFile(graph_output_dir + filename, std::ios::ate);
+    if (checkFile && checkFile.tellg() != 0) {
+        file.close();
+        std::mt19937 rng(seed);
+        std::string new_filename = filename + "_" + std::to_string(rng());
+        file = std::ofstream(graph_output_dir + new_filename);
+    }
+    checkFile.close();
+
+    std::vector<int> levels(hgraph[0].size(), 0);
+    for (int i = hgraph.size() - 1; i > 0; --i) {
+        for (int j = 0; j < hgraph[i].size(); ++j) {
+            if (hgraph[i][j].candidates_.empty()) {
+                continue;
+            }
+            levels[j] = std::max(levels[j], i);
+        }
+    }
+
+    file << hgraph.size() << std::endl;
+    for (size_t i = 0; i < hgraph[0].size(); ++i) {
+        file << i << " " << levels[i] << std::endl;
+        for (int j = 0; j <= levels[i]; ++j) {
+            auto& graph = hgraph[j];
+            if (graph[i].candidates_.empty()) {
+                continue;
+            }
+            file << j << " " << graph[i].candidates_.size() << " ";
+            for (auto& neighbor : graph[i].candidates_) {
+                file << neighbor.id << " ";
+            }
         }
         file << std::endl;
     }
@@ -502,4 +567,77 @@ graph::loadGraph(Graph& graph, const std::string& filename) {
         graph.push_back(neighborhood);
     }
     file.close();
+}
+
+int
+graph::checkConnectivity(const Graph& graph) {
+    int n = (int)graph.size();
+    std::vector<bool> visited(n, false);
+    std::stack<int> finishStack;
+
+    auto dfs1 = [&](int start, const Graph& g) {
+        std::stack<int> s;
+        s.push(start);
+        visited[start] = true;
+
+        while (!s.empty()) {
+            int node = s.top();
+            bool finished = true;
+            for (const auto& neighbor : g[node].candidates_) {
+                if (!visited[neighbor.id]) {
+                    visited[neighbor.id] = true;
+                    s.push(neighbor.id);
+                    finished = false;
+                    break;
+                }
+            }
+            if (finished) {
+                s.pop();
+                finishStack.push(node);
+            }
+        }
+    };
+
+    auto dfs2 = [&](int start, const Graph& g, std::vector<bool>& visited) {
+        std::stack<int> s;
+        s.push(start);
+        visited[start] = true;
+
+        while (!s.empty()) {
+            int node = s.top();
+            s.pop();
+            for (const auto& neighbor : g[node].candidates_) {
+                if (!visited[neighbor.id]) {
+                    visited[neighbor.id] = true;
+                    s.push(neighbor.id);
+                }
+            }
+        }
+    };
+
+    for (int i = 0; i < n; ++i) {
+        if (!visited[i]) {
+            dfs1(i, graph);
+        }
+    }
+
+    Graph reverseGraph(n);
+    for (int i = 0; i < n; ++i) {
+        for (const auto& neighbor : graph[i].candidates_) {
+            reverseGraph[neighbor.id].candidates_.emplace_back(i, neighbor.distance, false);
+        }
+    }
+
+    std::fill(visited.begin(), visited.end(), false);
+    int componentCount = 0;
+    while (!finishStack.empty()) {
+        int node = finishStack.top();
+        finishStack.pop();
+
+        if (!visited[node]) {
+            componentCount++;
+            dfs2(node, reverseGraph, visited);
+        }
+    }
+    return componentCount;
 }

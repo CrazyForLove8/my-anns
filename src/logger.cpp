@@ -4,7 +4,7 @@ using namespace graph;
 
 bool Log::verbose = false;
 bool Log::newLine = true;
-std::string Log::dir = "log";
+std::string Log::dir = "/root/code/algotests/myanns/logs";
 std::ofstream Log::logFile;
 std::mutex Log::mutex;
 
@@ -47,9 +47,9 @@ Log::redirect(std::string filename) {
     if (filename.empty()) {
         filename = dir + "/" + timestamp + ".txt";
     } else {
-        filename = dir + "/" + filename + "_" + timestamp + ".txt";
+        filename = dir + "/" + filename + ".log";
     }
-    logFile.open(filename);
+    logFile.open(filename, std::ios::app);
     if (!logFile) {
         throw std::runtime_error("Cannot open log file");
     }

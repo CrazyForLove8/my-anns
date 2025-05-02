@@ -5,17 +5,17 @@
 #include "visittable.h"
 
 graph::VisitedList::VisitedList(size_t num)
-    : size_(num), version_(-1), block_(new unsigned short[num]) {
+    : size_(num), version_(-1), block_(new unsigned int[num]) {
 }
 
 void
 graph::VisitedList::reset() {
     if (not block_) {
-        block_ = (unsigned short*)malloc(size_ * sizeof(unsigned short));
+        block_ = (unsigned int*)malloc(size_ * sizeof(unsigned int));
     }
     version_++;
-    if (version_ == 0 || version_ >= std::numeric_limits<unsigned short>::max() - 1) {
-        memset(block_, 0, sizeof(unsigned short) * size_);
+    if (version_ == 0 || version_ >= std::numeric_limits<unsigned int>::max() - 1) {
+        memset(block_, 0, sizeof(unsigned int) * size_);
         version_++;
     }
 }

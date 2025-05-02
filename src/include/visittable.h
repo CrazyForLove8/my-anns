@@ -20,8 +20,8 @@ namespace graph {
 
 class VisitedList {
 public:
-    unsigned short version_;
-    unsigned short* block_;
+    unsigned int version_;
+    unsigned int* block_;
     size_t size_;
 
     explicit VisitedList(size_t num);

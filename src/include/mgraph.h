@@ -9,6 +9,7 @@
 
 using namespace graph;
 
+// MGraph refers to Merged hierarchical Graph index
 class MGraph : public FGIM {
 private:
     HGraph graph_;
@@ -19,9 +20,15 @@ private:
 
     double reverse_;
 
-    uint32_t enter_point_;
-
     uint32_t ef_construction_;
+
+    uint32_t max_level_;
+
+    uint32_t cur_max_level_;
+
+    std::vector<uint32_t> levels;
+
+    std::mutex graph_lock_;
 
     void
     CrossQuery(std::vector<IndexPtr>& indexes) override;
@@ -36,9 +43,22 @@ private:
     heuristic(Neighbors& candidates, unsigned max_degree);
 
 public:
+    uint32_t enter_point_;
+
     MGraph();
 
     explicit MGraph(unsigned int max_degree, unsigned int ef_construction, float sample_rate = 0.3);
+
+    explicit MGraph(DatasetPtr& dataset,
+                    unsigned int max_degree,
+                    unsigned int ef_construction,
+                    float sample_rate = 0.3);
+
+    Graph&
+    extractGraph() override;
+
+    HGraph&
+    extractHGraph();
 
     void
     Combine(std::vector<IndexPtr>& indexes) override;

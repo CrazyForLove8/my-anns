@@ -62,6 +62,9 @@ public:
     virtual Graph&
     extractGraph();
 
+    virtual FlattenGraph&
+    extractFlattenGraph();
+
     virtual DatasetPtr&
     extractDataset();
 
@@ -77,5 +80,19 @@ public:
 };
 
 using IndexPtr = std::shared_ptr<Index>;
+
+class IndexWrapper : public Index {
+public:
+    explicit IndexWrapper(IndexPtr& index);
+
+    IndexWrapper() = default;
+
+    ~IndexWrapper() override = default;
+
+    void
+    append(std::vector<IndexPtr>& indexes);
+};
+
+// TODO Support IndexFactory
 
 #endif  //MYANNS_INDEX_H

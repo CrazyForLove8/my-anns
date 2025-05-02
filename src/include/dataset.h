@@ -43,12 +43,14 @@ private:
 public:
     Dataset();
 
+    ~Dataset() = default;
+
     /**
-                 * @brief Get the instance of the dataset
-                 * @param name sift, gist, deep, msong, glove, crawl
-                 * @param size 10k, 100k, 1m, 10m or empty for the default size
-                 * @return
-                 */
+                     * @brief Get the instance of the dataset
+                     * @param name sift, gist, deep, msong, glove, crawl
+                     * @param size 10k, 100k, 1m, 10m or empty for the default size
+                     * @return
+                     */
     static std::shared_ptr<Dataset>
     getInstance(const std::string& name, const std::string& size);
 

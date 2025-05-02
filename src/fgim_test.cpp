@@ -12,7 +12,7 @@ testCombine() {
     auto datasets = std::vector<DatasetPtr>();
     //    auto nnd = std::make_shared<nndescent::NNDescent>(dataset, 20);
     //    nnd->build();
-    //    eval(nnd, dataset, 200);
+    //    recall(nnd, dataset, 200);
 
     dataset->split(datasets, 2);
     datasets.insert(datasets.begin(), dataset);
@@ -36,7 +36,7 @@ testCombine() {
 
     m.Combine(indexes);
 
-    eval(m, dataset, 200);
+    recall(m, dataset, 200);
 }
 
 void
@@ -64,6 +64,33 @@ testMerge() {
     FGIM m(20);
 }
 
+void
+exp3_nsw(DatasetPtr& dataset) {
+    //    auto datasets = std::vector<DatasetPtr>();
+    //    dataset->split(datasets, 2);
+    //    datasets.pushHeap(datasets.begin(), dataset);
+
+    auto nsw = std::make_shared<nsw::NSW>(dataset, 32, 200);
+
+    nsw->build();
+
+    recall(nsw, dataset);
+}
+
+void
+exp3_taumng(DatasetPtr& dataset) {
+    auto nsg = std::make_shared<nsg::NSG>(dataset, 32, 200, 32);
+
+    nsg->build();
+
+    recall(nsg, dataset, 200);
+
+    auto mng = std::make_shared<taumng::TauMNG>(dataset, nsg->extractGraph(), 10, 32, 200);
+    mng->build();
+
+    recall(mng, dataset, 200);
+}
+
 int
 main() {
 #if not MULTI_THREAD
@@ -71,5 +98,12 @@ main() {
 #endif
     Log::setVerbose(true);
 
-    testCombine();
+    auto dataset = Dataset::getInstance("sift", "1m");
+
+    exp3_taumng(dataset);
+
+    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
+    if (ret != 0) {
+        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
+    }
 }

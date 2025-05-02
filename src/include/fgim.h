@@ -38,7 +38,7 @@ protected:
     update_neighbors(Graph& graph);
 
     void
-    prune(Graph& graph);
+    prune(Graph& graph, bool add = false);
 
     void
     add_reverse_edge(Graph& graph);
@@ -51,11 +51,13 @@ public:
 
     static constexpr unsigned SAMPLES = 100;
 
-    static constexpr float THRESHOLD = 0.001;
+    static constexpr float THRESHOLD = 0.002;
 
     FGIM();
 
     explicit FGIM(unsigned max_degree, float sample_rate = 0.3);
+
+    FGIM(DatasetPtr& dataset, unsigned max_degree, float sample_rate = 0.3, bool allocate = true);
 
     ~FGIM() override = default;
 

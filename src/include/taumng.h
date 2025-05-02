@@ -16,33 +16,35 @@ namespace taumng {
 class TauMNG : public Index {
 private:
     /**
-                   * tau
-                   */
+                       * tau
+                       */
     float t_;
 
     /**
-                   * same as k in knn HNSW_search
-                   */
+                       * same as k in knn HNSW_search
+                       */
     int h_;
 
     /**
-                   * HNSW_search pool size
-                   */
+                       * search pool size
+                       */
     int b_;
+
+    Graph& base_;
 
     void
     build_internal() override;
 
 public:
     /**
-             * @brief Build a TauMNG graph. Note that the graph is destroyed after the build since std::move is called.
-             * @param oracle
-             * @param graph
-             * @param t
-             * @param h
-             * @param b
-             */
-    TauMNG(DatasetPtr& dataset, Graph& graph, float t, int h, int b);
+         * @brief Build a TauMNG graph.
+         * @param oracle
+         * @param graph
+         * @param t
+         * @param h
+         * @param b
+         */
+    TauMNG(DatasetPtr& dataset, Graph& base, float t, int h, int b);
 
     void
     set_b(int b);

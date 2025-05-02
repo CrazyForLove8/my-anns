@@ -1,7 +1,11 @@
 #include "nndescent.h"
 
-nndescent::NNDescent::NNDescent(DatasetPtr& dataset, int K, float rho, float delta, int iteration)
-    : Index(dataset), K_(K), rho_(rho), delta_(delta), iteration_(iteration) {
+nndescent::NNDescent::NNDescent(DatasetPtr &dataset,
+                                int K,
+                                float rho,
+                                float delta,
+                                int iteration)
+        : Index(dataset), K_(K), rho_(rho), delta_(delta), iteration_(iteration) {
 }
 
 //void
@@ -61,11 +65,11 @@ nndescent::NNDescent::generateUpdate() {
         std::mt19937 rng(2024 + omp_get_thread_num());
 #pragma omp for
         for (size_t v = 0; v < graph_.size(); ++v) {
-            auto& _old = graph_[v].old_;
-            auto& _new = graph_[v].new_;
+            auto &_old = graph_[v].old_;
+            auto &_new = graph_[v].new_;
             unsigned size = graph_[v].candidates_.size();
             for (size_t neighbor_index = 0; neighbor_index < size; ++neighbor_index) {
-                auto& neighbor = graph_[v].candidates_[neighbor_index];
+                auto &neighbor = graph_[v].candidates_[neighbor_index];
                 if (neighbor.flag) {
                     _new.emplace_back(neighbor.id);
                     {
@@ -92,11 +96,11 @@ nndescent::NNDescent::applyUpdate(unsigned sample) {
     {
         std::mt19937 rng(2024 + omp_get_thread_num());
 #pragma omp for reduction(+ : cnt) schedule(dynamic, 256)
-        for (auto& v : graph_) {
-            auto& _old = v.old_;
-            auto& _new = v.new_;
-            auto& _r_old = v.reverse_old_;
-            auto& _r_new = v.reverse_new_;
+        for (auto &v: graph_) {
+            auto &_old = v.old_;
+            auto &_new = v.new_;
+            auto &_r_old = v.reverse_old_;
+            auto &_r_new = v.reverse_new_;
 
             shuffle(_r_new.begin(), _r_new.end(), rng);
             if (_r_new.size() > sample) {
@@ -119,8 +123,8 @@ nndescent::NNDescent::applyUpdate(unsigned sample) {
                     auto dist = (*oracle_)(_new[i], _new[j]);
                     if (dist < graph_[_new[i]].candidates_.front().distance ||
                         dist < graph_[_new[j]].candidates_.front().distance) {
-                        cnt += graph_[_new[i]].insert(_new[j], dist);
-                        cnt += graph_[_new[j]].insert(_new[i], dist);
+                        cnt += graph_[_new[i]].pushHeap(_new[j], dist);
+                        cnt += graph_[_new[j]].pushHeap(_new[i], dist);
                     }
                 }
                 for (size_t j = 0; j < _old_size; ++j) {
@@ -130,8 +134,8 @@ nndescent::NNDescent::applyUpdate(unsigned sample) {
                     auto dist = (*oracle_)(_new[i], _old[j]);
                     if (dist < graph_[_new[i]].candidates_.front().distance ||
                         dist < graph_[_old[j]].candidates_.front().distance) {
-                        cnt += graph_[_new[i]].insert(_old[j], dist);
-                        cnt += graph_[_old[j]].insert(_new[i], dist);
+                        cnt += graph_[_new[i]].pushHeap(_old[j], dist);
+                        cnt += graph_[_old[j]].pushHeap(_new[i], dist);
                     }
                 }
             }
@@ -143,7 +147,7 @@ nndescent::NNDescent::applyUpdate(unsigned sample) {
 void
 nndescent::NNDescent::clearGraph() {
 #pragma omp parallel for
-    for (auto& v : graph_) {
+    for (auto &v: graph_) {
         v.old_.clear();
         v.new_.clear();
         v.reverse_old_.clear();
@@ -165,7 +169,7 @@ nndescent::NNDescent::build_internal() {
         clearGraph();
     }
 #pragma omp parallel for
-    for (auto& u : graph_) {
+    for (auto &u: graph_) {
         std::sort(u.candidates_.begin(), u.candidates_.end());
     }
 }

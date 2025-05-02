@@ -14,5 +14,6 @@
 #include "nsw.h"
 #include "taumng.h"
 #include "vamana.h"
+#include "nnmerge.h"
 
 #endif  //MYANNS_ANNSLIB_H

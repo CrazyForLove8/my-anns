@@ -121,13 +121,12 @@ hnsw::HNSW::addPoint(unsigned int index) {
                   res.end());
         res.erase(std::unique(res.begin(), res.end()), res.end());
 
-        auto& graph = graph_[i];
-        auto& candidates = graph[index].candidates_;
         auto cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
         prune(res, cur_max_cnt);
 
+        auto& graph = graph_[i];
+        auto& candidates = graph[index].candidates_;
         candidates.swap(res);
-
         for (auto& e : candidates) {
             std::lock_guard<std::mutex> lock(graph_[0][e.id].lock_);
             graph[e.id].addNeighbor(Neighbor(index, e.distance, false));
@@ -298,11 +297,6 @@ hnsw::HNSW::prune(Neighbors& candidates, int max_neighbors) {
 Neighbors
 hnsw::HNSW::search(const float* query, unsigned int topk, unsigned int L) const {
     unsigned cur_node_ = enter_point_;
-    //    for (int i = graph_.size() - 1; i > 0; --i) {
-    //        auto res = knn_search(oracle_.get(), graph_[i], query, 1, 1, cur_node_);
-    //        cur_node_ = res[0].id;
-    //    }
-    //    auto res = knn_search(oracle_.get(), graph_[0], query, topk, L, cur_node_);
     for (int i = flatten_graph_.size() - 1; i > 0; --i) {
         auto res = graph::search(
             oracle_.get(), visited_list_pool_.get(), flatten_graph_[i], query, 1, 1, cur_node_);
@@ -383,6 +377,8 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
     auto cur_size = oracle_->size();
     auto total = dataset->getOracle()->size() + cur_size;
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    levels.reserve(total);
+    levels.resize(total);
     for (auto i = cur_size; i < total; i++) {
         levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
         max_level_ = std::max(max_level_, levels[i]);
@@ -397,6 +393,7 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
         dataset_->merge(datasets);
     }
 
+#pragma omp parallel for schedule(dynamic)
     for (int i = cur_size; i < total; ++i) {
         if (i % 10000 == 0) {
             logger << "Adding " << i << " / " << total << std::endl;

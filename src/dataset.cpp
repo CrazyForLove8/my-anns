@@ -26,14 +26,14 @@ Dataset::Dataset() {
 void
 Dataset::load() {
     std::string base_path, query_path, groundtruth_path;
-    if (name_ == "sift" && size_ == "10k") {
-        base_path = "/root/datasets/sift/10k/sift_base.fvecs";
-        query_path = "/root/datasets/sift/10k/sift_query.fvecs";
-        groundtruth_path = "/root/datasets/sift/10k/sift_groundtruth.ivecs";
-    } else if (name_ == "sift" && size_ == "1m") {
-        base_path = "/root/datasets/sift/1m/sift_base.fvecs";
-        query_path = "/root/datasets/sift/1m/sift_query.fvecs";
-        groundtruth_path = "/root/datasets/sift/1m/sift_groundtruth.ivecs";
+    if (name_ == "sift") {
+        base_path = "/root/datasets/sift/" + size_ + "/sift_base.fvecs";
+        if (size_ == "10k") {
+            query_path = "/root/datasets/sift/10k/sift_query.fvecs";
+        } else {
+            query_path = "/root/datasets/sift/1m/sift_query.fvecs";
+        }
+        groundtruth_path = "/root/datasets/sift/" + size_ + "/sift_groundtruth.ivecs";
     } else if (name_ == "gist") {
         base_path = "/root/datasets/gist/gist_base.fvecs";
         query_path = "/root/datasets/gist/gist_query.fvecs";
@@ -50,14 +50,6 @@ Dataset::load() {
         base_path = "/root/datasets/glove/twitter/glove_base_100d.fvecs";
         query_path = "/root/datasets/glove/twitter/glove_query_100d.fvecs";
         groundtruth_path = "/root/datasets/glove/twitter/glove_groundtruth_100d.ivecs";
-    } else if (name_ == "sift" && size_ == "10m") {
-        base_path = "/root/datasets/sift/10m/sift_base.fvecs";
-        query_path = "/root/datasets/sift/10m/sift_query.fvecs";
-        groundtruth_path = "/root/datasets/sift/10m/sift_groundtruth.ivecs";
-    } else if (name_ == "sift" && size_ == "100k") {
-        base_path = "/root/datasets/sift/100k/sift_base.fvecs";
-        query_path = "/root/datasets/sift/100k/sift_query.fvecs";
-        groundtruth_path = "/root/datasets/sift/100k/sift_groundtruth.ivecs";
     } else if (name_ == "crawl") {
         base_path = "/root/datasets/crawl/crawl_base.fvecs";
         query_path = "/root/datasets/crawl/crawl_query.fvecs";

@@ -18,7 +18,7 @@ test_nndescent(DatasetPtr& dataset) {
 
     nndescent.build();
 
-    eval(nndescent, dataset, 200);
+    recall(nndescent, dataset, 200);
 }
 
 void
@@ -27,7 +27,7 @@ test_vamana(DatasetPtr& dataset) {
 
     vamana.build();
 
-    eval(vamana, dataset, 200);
+    recall(vamana, dataset, 200);
 }
 
 void
@@ -42,7 +42,7 @@ test_taumng(DatasetPtr& dataset) {
 
     taumng.build();
 
-    eval(taumng, dataset, 200);
+    recall(taumng, dataset, 200);
 }
 
 void
@@ -51,7 +51,7 @@ test_nsw(DatasetPtr& dataset) {
 
     nsw.build();
 
-    eval(nsw, dataset, 200);
+    recall(nsw, dataset, 200);
 }
 
 void
@@ -60,7 +60,7 @@ test_hnsw(DatasetPtr& dataset) {
 
     hnsw.build();
 
-    eval(hnsw, dataset);
+    recall(hnsw, dataset);
 }
 
 int

@@ -31,6 +31,9 @@ private:
 public:
     NSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
 
+    void
+    add(graph::DatasetPtr& dataset) override;
+
     ~NSW() override = default;
 
     void

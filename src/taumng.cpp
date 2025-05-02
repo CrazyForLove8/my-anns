@@ -1,8 +1,7 @@
 #include "taumng.h"
 
-taumng::TauMNG::TauMNG(DatasetPtr& dataset, Graph& graph, float t, int h, int b)
-    : Index(dataset), t_(t), h_(h), b_(b) {
-    graph_ = std::move(graph);
+taumng::TauMNG::TauMNG(DatasetPtr& dataset, Graph& base, float t, int h, int b)
+    : Index(dataset), t_(t), h_(h), b_(b), base_(base) {
 }
 
 void
@@ -73,7 +72,8 @@ taumng::TauMNG::build_internal() {
             logger << "Processing " << u << " / " << graph_.size() << std::endl;
         }
         auto H_u_ =
-            knn_search(oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u], h_, b_);
+            knn_search(oracle_.get(), visited_list_pool_.get(), base_, (*oracle_)[u], h_, b_);
+        Neighbors candidates;
         for (auto& v : H_u_) {
             if (u == v.id) {
                 continue;
@@ -89,7 +89,7 @@ taumng::TauMNG::build_internal() {
                 continue;
             }
             if (v.distance <= 3 * t_) {
-                graph_[u].addNeighbor(v);
+                candidates.emplace_back(v);
             } else {
                 bool flag = false;
                 for (auto& w : graph_[u].candidates_) {
@@ -100,9 +100,10 @@ taumng::TauMNG::build_internal() {
                     }
                 }
                 if (!flag) {
-                    graph_[u].addNeighbor(v);
+                    candidates.emplace_back(v);
                 }
             }
         }
+        graph_[u].candidates_.swap(candidates);
     }
 }

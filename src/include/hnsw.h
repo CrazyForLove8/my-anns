@@ -30,8 +30,6 @@ protected:
 
     uint32_t ef_construction_;
 
-    uint32_t enter_point_;
-
     std::vector<uint32_t> levels;
 
     double reverse_;
@@ -50,14 +48,14 @@ protected:
         const Graph& graph, const float* query, size_t topk, size_t L, size_t entry_id) const;
 
     /**
-                           * This implementation follows the original paper.
-                           * @param graph
-                           * @param oracle
-                           * @param query
-                           * @param enter_point
-                           * @param ef
-                           * @return
-                           */
+                               * This implementation follows the original paper.
+                               * @param graph
+                               * @param oracle
+                               * @param query
+                               * @param enter_point
+                               * @param ef
+                               * @return
+                               */
     Neighbors
     searchLayer(Graph& graph, IndexOracle<float>& oracle, float* query, int enter_point, int ef);
 
@@ -71,6 +69,8 @@ protected:
     build_internal() override;
 
 public:
+    uint32_t enter_point_;
+
     HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
 
     ~HNSW() override = default;

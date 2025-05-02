@@ -65,6 +65,8 @@ struct Neighbor {
         return id == n.id;
     }
 
+    Neighbor(const Neighbor& other);
+
     Neighbor&
     operator=(const Neighbor& other);
 };
@@ -79,12 +81,9 @@ struct Neighborhood {
     std::vector<int> reverse_old_;
     std::vector<int> reverse_new_;
 
-    int M_{std::numeric_limits<int>::max()};
-    float max_distance_{std::numeric_limits<float>::min()};
+    float greatest_distance = std::numeric_limits<float>::max();
 
     Neighborhood() = default;
-
-    explicit Neighborhood(int M);
 
     Neighborhood(int s, std::mt19937& rng, int N);
 
@@ -93,11 +92,24 @@ struct Neighborhood {
 
     Neighborhood(const Neighborhood& other);
 
+    /**
+             * Assure that candidates_ is already a heap with manually reserved capacity.
+             * Otherwise, this operation is invalid.
+             * @param id
+             * @param dist
+             * @return
+             */
     unsigned
-    insert(int id, float dist);
+    pushHeap(int id, float dist);
 
+    /**
+             * This function add nn into sorted candidates_ within a capacity limit.
+             * A capacity of negative numbers refers to no limit.
+             * @param nn
+             * @param capacity
+             */
     void
-    addNeighbor(Neighbor nn);
+    addNeighbor(Neighbor nn, int capacity = -1);
 
     /**
              * @brief Move the content of the other neighborhood to this neighborhood. Note that only the candidates are moved.
@@ -140,6 +152,12 @@ struct FlattenHGraph {
 
 inline void
 gen_random(std::mt19937& rng, int* addr, int size, int N) {
+    if (N - size <= 0) {
+        for (int i = 0; i < size; ++i) {
+            addr[i] = i;
+        }
+        return;
+    }
     for (int i = 0; i < size; ++i) {
         addr[i] = rng() % (N - size);
     }
@@ -195,8 +213,8 @@ knn_search(IndexOracle<float>* oracle,
            const float* query,
            int topk,
            int L,
-           size_t entry_id = -1,
-           size_t graph_sz = -1);
+           int entry_id = -1,
+           int graph_sz = -1);
 
 Neighbors
 search_layer(IndexOracle<float>* oracle,
@@ -206,12 +224,15 @@ search_layer(IndexOracle<float>* oracle,
              const float* query,
              int topk,
              int L,
-             size_t entry_id = -1,
-             size_t graph_sz = -1);
+             int entry_id = -1);
 
 Neighbors
-track_search(
-    IndexOracle<float>* oracle, const Graph& graph, const float* query, int entry_id, int L);
+track_search(IndexOracle<float>* oracle,
+             VisitedListPool* visited_list_pool,
+             Graph& graph,
+             const float* query,
+             int L,
+             int entry_id);
 
 /**
      * @brief Search the graph with the given query.
@@ -234,8 +255,14 @@ search(IndexOracle<float>* oracle,
        int entry_id = -1,
        int K0 = 128);
 
+int
+checkConnectivity(const Graph& graph);
+
 void
 saveGraph(Graph& graph, const std::string& filename);
+
+void
+saveHGraph(HGraph& hgraph, const std::string& filename);
 
 void
 loadGraph(Graph& graph, const std::string& filename);

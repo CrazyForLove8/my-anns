@@ -10,6 +10,7 @@
 #include <random>
 
 #include "index.h"
+#include "nndescent.h"
 
 using namespace graph;
 
@@ -19,20 +20,32 @@ private:
     int root{};
 
     /**
-                   * search pool size
-                   */
+       * search pool size
+       */
     unsigned L_;
 
     /**
-                   * maximum number of neighbors
-                   */
+       * maximum number of neighbors
+       */
     unsigned m_;
+
+    /**
+         * k used in nn-descent
+         */
+    unsigned K_;
 
     void
     build_internal() override;
 
 public:
-    NSG(DatasetPtr& dataset, unsigned L, unsigned m);
+    /**
+        * @brief Build an NSG. Note that the graph is destroyed after the build since std::move is called.
+        * @param oracle
+        * @param graph
+        * @param L search pool size
+        * @param m maximum number of neighbors
+        */
+    NSG(DatasetPtr& dataset, unsigned K, unsigned L, unsigned m);
 
     ~NSG() override = default;
 
@@ -51,6 +64,9 @@ public:
 
     void
     tree();
+
+    Neighbors
+    search(const float* query, unsigned int topk, unsigned int L) const override;
 };
 
 }  // namespace nsg
