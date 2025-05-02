@@ -46,13 +46,35 @@ public:
     ~Dataset() = default;
 
     /**
-                     * @brief Get the instance of the dataset
-                     * @param name sift, gist, deep, msong, glove, crawl
-                     * @param size 10k, 100k, 1m, 10m or empty for the default size
-                     * @return
-                     */
+     * @brief Get the instance of the dataset
+     * @param base_path path to the base file
+     * @param metric distance metric
+     * @return
+     */
+    static std::shared_ptr<Dataset>
+    getInstance(const std::string& base_path, DISTANCE metric);
+
+    /**
+     * @brief Get the instance of the dataset
+     * @param name sift, gist, deep, msong, glove, crawl
+     * @param size 10k, 100k, 1m, 10m or empty for the default size
+     * @return
+     */
     static std::shared_ptr<Dataset>
     getInstance(const std::string& name, const std::string& size);
+
+    /**
+     * @brief Get the instance of the dataset
+     * @param base_path path to the base file
+     * @param query_path path to the query file
+     * @param groundtruth_path path to the ground truth file
+     * @return
+     */
+    static std::shared_ptr<Dataset>
+    getInstance(const std::string& base_path,
+                const std::string& query_path,
+                const std::string& groundtruth_path,
+                DISTANCE metric);
 
     std::string&
     getName();

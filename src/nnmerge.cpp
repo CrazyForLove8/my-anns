@@ -1,19 +1,14 @@
 #include "nnmerge.h"
 
-nnmerge::NNMerge::NNMerge(DatasetPtr &dataset,
-                          int K_,
-                          float rho,
-                          float delta,
-                          int iteration,
-                          float alpha) : NNDescent(dataset, K_, rho, delta, iteration),
-                                         alpha(alpha) {
-
+nnmerge::NNMerge::NNMerge(
+    DatasetPtr& dataset, int K_, float rho, float delta, int iteration, float alpha)
+    : NNDescent(dataset, K_, rho, delta, iteration), alpha(alpha) {
 }
 
-void nnmerge::NNMerge::Combine(const IndexPtr &index1,
-                               const IndexPtr &index2) {
-    auto &graph1 = index1->extractGraph();
-    auto &graph2 = index2->extractGraph();
+void
+nnmerge::NNMerge::Combine(const IndexPtr& index1, const IndexPtr& index2) {
+    auto& graph1 = index1->extractGraph();
+    auto& graph2 = index2->extractGraph();
 
     graph_size_1 = graph1.size();
     graph_size_2 = graph2.size();
@@ -35,25 +30,26 @@ void nnmerge::NNMerge::Combine(const IndexPtr &index1,
     built_ = true;
 }
 
-void nnmerge::NNMerge::splitGraph(Graph &G_v,
-                                  const Graph &graph1,
-                                  const Graph &graph2) {
+void
+nnmerge::NNMerge::splitGraph(Graph& G_v, const Graph& graph1, const Graph& graph2) {
 #pragma omp parallel for
     for (size_t u = 0; u < graph_size_1; ++u) {
-        auto &neighbors = graph1[u].candidates_;
-        unsigned truncation = std::min(neighbors.size(), (size_t) K_) * alpha;
+        auto& neighbors = graph1[u].candidates_;
+        unsigned truncation = std::min(neighbors.size(), (size_t)K_) * alpha;
         graph_[u].candidates_.reserve(K_);
         G_v[u].candidates_.reserve(K_ - truncation);
-        std::copy(neighbors.begin(), neighbors.begin() + truncation,
+        std::copy(neighbors.begin(),
+                  neighbors.begin() + truncation,
                   std::back_inserter(graph_[u].candidates_));
-        std::copy(neighbors.begin() + truncation, neighbors.end(),
+        std::copy(neighbors.begin() + truncation,
+                  neighbors.end(),
                   std::back_inserter(G_v[u].candidates_));
     }
 
 #pragma omp parallel for
     for (size_t u = graph_size_1; u < graph_size_1 + graph_size_2; ++u) {
-        auto &neighbors = graph2[u - graph_size_1].candidates_;
-        unsigned truncation = std::min(neighbors.size(), (size_t) K_) * alpha;
+        auto& neighbors = graph2[u - graph_size_1].candidates_;
+        unsigned truncation = std::min(neighbors.size(), (size_t)K_) * alpha;
         graph_[u].candidates_.reserve(K_);
         G_v[u].candidates_.reserve(K_ - truncation);
         for (auto it = neighbors.begin(); it != neighbors.begin() + truncation; ++it) {
@@ -65,10 +61,12 @@ void nnmerge::NNMerge::splitGraph(Graph &G_v,
     }
 }
 
-void nnmerge::NNMerge::addSamples() {
+void
+nnmerge::NNMerge::addSamples() {
     std::mt19937 rng(2024);
     std::uniform_int_distribution<unsigned> _graph_1_samples(0, graph_size_1 - 1);
-    std::uniform_int_distribution<unsigned> _graph_2_samples(graph_size_1, graph_size_1 + graph_size_2 - 1);
+    std::uniform_int_distribution<unsigned> _graph_2_samples(graph_size_1,
+                                                             graph_size_1 + graph_size_2 - 1);
 #pragma omp parallel for
     for (size_t u = 0; u < graph_size_1 + graph_size_2; ++u) {
         unsigned current_size = graph_[u].candidates_.size();
@@ -89,7 +87,8 @@ void nnmerge::NNMerge::addSamples() {
     }
 }
 
-void nnmerge::NNMerge::nndescent() {
+void
+nnmerge::NNMerge::nndescent() {
     size_t it = 0;
     unsigned sample = 100;
     while (++it && it <= iteration_) {
@@ -97,7 +96,8 @@ void nnmerge::NNMerge::nndescent() {
         generateUpdate();
         int cnt = applyUpdate(sample);
         logger << cnt << " updates" << std::endl;
-        unsigned convergence = std::lround(delta_ * static_cast<float>(graph_.size()) * static_cast<float>(K_));
+        unsigned convergence =
+            std::lround(delta_ * static_cast<float>(graph_.size()) * static_cast<float>(K_));
         if (cnt <= convergence) {
             break;
         }
@@ -105,32 +105,35 @@ void nnmerge::NNMerge::nndescent() {
     }
 }
 
-void nnmerge::NNMerge::mergeGraph(Graph &G_v) {
+void
+nnmerge::NNMerge::mergeGraph(Graph& G_v) {
     int cnt = 0;
-#pragma omp parallel for reduction(+:cnt)
+#pragma omp parallel for reduction(+ : cnt)
     for (size_t u = 0; u < graph_size_1 + graph_size_2; ++u) {
-        for (auto &v: G_v[u].candidates_) {
+        for (auto& v : G_v[u].candidates_) {
             cnt += graph_[u].pushHeap(v.id, v.distance);
         }
     }
     logger << cnt << " updates" << std::endl;
 }
 
-void nnmerge::NNMerge::build_internal() {
+void
+nnmerge::NNMerge::build_internal() {
     throw std::runtime_error("Not implemented, please use Combine instead");
 }
 
-int nnmerge::NNMerge::applyUpdate(unsigned int sample) {
+int
+nnmerge::NNMerge::applyUpdate(unsigned int sample) {
     int cnt = 0;
 #pragma omp parallel
     {
         std::mt19937 rng(2024 + omp_get_thread_num());
-#pragma omp for reduction(+:cnt) schedule(dynamic)
-        for (auto &v: graph_) {
-            auto &_old = v.old_;
-            auto &_new = v.new_;
-            auto &_r_old = v.reverse_old_;
-            auto &_r_new = v.reverse_new_;
+#pragma omp for reduction(+ : cnt) schedule(dynamic)
+        for (auto& v : graph_) {
+            auto& _old = v.old_;
+            auto& _new = v.new_;
+            auto& _r_old = v.reverse_old_;
+            auto& _r_new = v.reverse_new_;
 
             shuffle(_r_new.begin(), _r_new.end(), rng);
             if (_r_new.size() > sample) {
@@ -183,4 +186,3 @@ int nnmerge::NNMerge::applyUpdate(unsigned int sample) {
     }
     return cnt;
 }
-

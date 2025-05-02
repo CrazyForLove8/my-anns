@@ -5,23 +5,24 @@
 #ifndef MYANNS_KMEANS_H
 #define MYANNS_KMEANS_H
 
+#include <omp.h>
+
+#include <chrono>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <list>
-#include <omp.h>
-#include <list>
-#include <chrono>
-#include <random>
-#include <fstream>
 #include <map>
-#include <iomanip>
+#include <random>
+
 #include "dataset.h"
 
 // TODO Only center is needed. Point can be replaced by short*.
 struct Point {
     Point() = default;
 
-    Point(int id,
-          int group) : id_(id), group_(group) {}
+    Point(int id, int group) : id_(id), group_(group) {
+    }
 
     ~Point() {
         delete[] data_;
@@ -29,7 +30,7 @@ struct Point {
 
     int id_{0};
     int group_{0};
-    float *data_{nullptr};
+    float* data_{nullptr};
 };
 
 class Kmeans {
@@ -40,17 +41,19 @@ private:
     int k_;
     int pointNumber_;
 
-    OraclePtr &oracle_;
+    OraclePtr& oracle_;
 
-    void Init();
+    void
+    Init();
 
-    void Cluster();
+    void
+    Cluster();
 
-    void Center();
+    void
+    Center();
 
 public:
-    Kmeans(DatasetPtr &dataset,
-           int k);
+    Kmeans(DatasetPtr& dataset, int k);
 
     /**
      * Get the ell nearest centers of the p
@@ -58,11 +61,11 @@ public:
      * @param ell
      * @return
      */
-    std::vector<int> NearestCenter(int p,
-                                   int ell);
+    std::vector<int>
+    NearestCenter(int p, int ell);
 
-    void Run();
-
+    void
+    Run();
 };
 
-#endif //MYANNS_KMEANS_H
+#endif  //MYANNS_KMEANS_H

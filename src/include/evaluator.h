@@ -42,14 +42,14 @@ namespace graph {
  * @param search_L
  * @param runs
  */
-    void
-    dist(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
-         DatasetPtr &dataset,
-         unsigned search_L = -1,
-         unsigned K = 10,
-         unsigned runs = 3);
+void
+dist(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
+     DatasetPtr& dataset,
+     unsigned search_L = -1,
+     unsigned K = 10,
+     unsigned runs = 3);
 
-    /**
+/**
      * Evaluate the recall rate of the index
      * @param index
      * @param dataset
@@ -57,12 +57,12 @@ namespace graph {
      * @param search_L
      * @param runs
      */
-    void
-    recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
-           DatasetPtr &dataset,
-           int search_L = -1,
-           unsigned K = 10,
-           unsigned runs = 3);
+void
+recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
+       DatasetPtr& dataset,
+       int search_L = -1,
+       unsigned K = 10,
+       unsigned runs = 3);
 }  // namespace graph
 
 #endif  // MYANNS_EVALUATOR_H

@@ -12,6 +12,69 @@ Dataset::getInstance(const std::string& name, const std::string& size) {
     return dataset;
 }
 
+std::shared_ptr<Dataset>
+Dataset::getInstance(const std::string& base_path, DISTANCE metric) {
+    auto dataset = std::make_shared<Dataset>();
+    dataset->name_ = "custom";
+    dataset->size_ = "custom";
+
+    dataset->base_->load(base_path);
+
+    switch (metric) {
+        case DISTANCE::L2:
+            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(*dataset->base_);
+            break;
+        case DISTANCE::COSINE:
+            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(*dataset->base_);
+            break;
+        case DISTANCE::JACCARD:
+            throw std::runtime_error("Jaccard distance is currently not supported");
+            break;
+        case DISTANCE::HAMMING:
+            throw std::runtime_error("Hamming distance is currently not supported");
+            break;
+    }
+
+    dataset->full_dataset_ = true;
+    dataset->visited_list_pool_ = VisitedListPool::getInstance(dataset->base_->size());
+
+    return dataset;
+}
+
+std::shared_ptr<Dataset>
+Dataset::getInstance(const std::string& base_path,
+                     const std::string& query_path,
+                     const std::string& groundtruth_path,
+                     DISTANCE metric) {
+    auto dataset = std::make_shared<Dataset>();
+    dataset->name_ = "custom";
+    dataset->size_ = "custom";
+
+    dataset->base_->load(base_path);
+    dataset->query_->load(query_path);
+    dataset->groundTruth_->load(groundtruth_path);
+
+    switch (metric) {
+        case DISTANCE::L2:
+            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(*dataset->base_);
+            break;
+        case DISTANCE::COSINE:
+            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(*dataset->base_);
+            break;
+        case DISTANCE::JACCARD:
+            throw std::runtime_error("Jaccard distance is currently not supported");
+            break;
+        case DISTANCE::HAMMING:
+            throw std::runtime_error("Hamming distance is currently not supported");
+            break;
+    }
+
+    dataset->full_dataset_ = true;
+    dataset->visited_list_pool_ = VisitedListPool::getInstance(dataset->base_->size());
+
+    return dataset;
+}
+
 Dataset::Dataset() {
     base_ = std::make_shared<Matrix<float>>();
     query_ = std::make_shared<Matrix<float>>();

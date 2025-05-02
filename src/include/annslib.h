@@ -10,10 +10,10 @@
 #include "hnsw.h"
 #include "mgraph.h"
 #include "nndescent.h"
+#include "nnmerge.h"
 #include "nsg.h"
 #include "nsw.h"
 #include "taumng.h"
 #include "vamana.h"
-#include "nnmerge.h"
 
 #endif  //MYANNS_ANNSLIB_H

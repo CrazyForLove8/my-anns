@@ -1,7 +1,7 @@
 #include "annslib.h"
 
 void
-testMerge(DatasetPtr &dataset) {
+testMerge(DatasetPtr& dataset) {
     Log::redirect("12_nnm_" + dataset->getName());
     auto datasets = std::vector<DatasetPtr>();
     dataset->split(datasets, 2);
@@ -26,11 +26,11 @@ testMerge(DatasetPtr &dataset) {
 }
 
 void
-testSaveGraph(DatasetPtr &dataset) {
+testSaveGraph(DatasetPtr& dataset) {
     auto nnd = std::make_shared<nndescent::NNDescent>(dataset, 32);
     nnd->build();
 
-    auto &graph = nnd->extractGraph();
+    auto& graph = nnd->extractGraph();
     saveGraph(graph, "nnd_" + dataset->getName());
 }
 
