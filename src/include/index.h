@@ -83,6 +83,8 @@ using IndexPtr = std::shared_ptr<Index>;
 
 class IndexWrapper : public Index {
 public:
+    explicit IndexWrapper(DatasetPtr& dataset, Graph& graph);
+
     explicit IndexWrapper(IndexPtr& index);
 
     IndexWrapper() = default;

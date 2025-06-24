@@ -85,6 +85,16 @@ Index::extractFlattenGraph() {
     return flatten_graph_;
 }
 
+IndexWrapper::IndexWrapper(DatasetPtr& dataset, Graph& graph) {
+    dataset_ = dataset;
+    oracle_ = dataset->getOracle();
+    base_ = dataset->getBasePtr();
+    visited_list_pool_ = dataset->getVisitedListPool();
+    graph_ = std::move(graph);
+    flatten_graph_ = FlattenGraph(graph_);
+    built_ = true;
+}
+
 IndexWrapper::IndexWrapper(IndexPtr& index) {
     dataset_ = index->extractDataset();
     oracle_ = dataset_->getOracle();
