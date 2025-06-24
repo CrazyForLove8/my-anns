@@ -17,12 +17,12 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
 
 #include "logger.h"
-#include "metric.h"
 
 #ifdef __GNUC__
 #ifdef __AVX__
@@ -57,27 +57,64 @@ class Matrix {
     char* data;
 
     void
-    reset(unsigned r, unsigned c) {
+    reset(const unsigned r, const unsigned c) {
         row = r;
         col = c;
         stride = (sizeof(T) * c + ALIGNMENT - 1) / ALIGNMENT * ALIGNMENT;
         if (data)
             free(data);
-        data = (char*)memalign(ALIGNMENT, row * stride);
+        data = static_cast<char*>(memalign(ALIGNMENT, row * stride));
+    }
+
+    void load_vecs_data(std::ifstream& is, const unsigned int skip, const unsigned int gap) {
+        is.seekg(0, std::ios::end);
+        size_t size = is.tellg();
+        size -= skip;
+        is.seekg(0, std::ios::beg);
+        unsigned dim;
+        is.read(reinterpret_cast<char*>(&dim), sizeof(unsigned int));
+        unsigned line = sizeof(T) * dim + gap;
+        unsigned N = size / line;
+        logger << "Vector size: " << N << std::endl;
+        logger << "Vector dimension: " << dim << std::endl;
+        reset(N, dim);
+        zero();
+        is.seekg(skip, std::ios::beg);
+        for (unsigned i = 0; i < N; ++i) {
+            is.seekg(gap, std::ios::cur);
+            is.read(&data[stride * i], sizeof(T) * dim);
+        }
+    }
+
+    void load_bin_data(std::ifstream& is) {
+        unsigned size, dim;
+        is.read(reinterpret_cast<char*>(&size), sizeof(unsigned int));
+        is.read(reinterpret_cast<char*>(&dim), sizeof(unsigned int));
+        logger << "Vector size: " << size << std::endl;
+        logger << "Vector dimension: " << dim << std::endl;
+        reset(size, dim);
+        zero();
+        for (unsigned i = 0; i < size; ++i) {
+            is.read(&data[stride * i], sizeof(T) * dim);
+        }
+    }
+
+    void load_hdf5_data(std::ifstream& is) {
+        throw std::runtime_error("HDF5 loading is not implemented.");
     }
 
 public:
-    Matrix() : col(0), row(0), stride(0), data(nullptr) {
+    Matrix() : data(nullptr) {
     }
 
-    Matrix(unsigned r, unsigned c) {
+    Matrix(const unsigned r, const unsigned c) {
         data = nullptr;
         reset(r, c);
     }
 
     Matrix(const Matrix& m) {
         col = m.col, row = m.row, stride = m.stride, data = nullptr;
-        data = (char*)memalign(ALIGNMENT, row * stride);
+        data = static_cast<char*>(memalign(ALIGNMENT, row * stride));
         memcpy(data, m.data, row * stride);
     }
 
@@ -89,7 +126,7 @@ public:
         for (const auto& matrix : matrices) {
             row += matrix->row;
         }
-        data = (char*)memalign(32, row * stride);
+        data = static_cast<char*>(memalign(32, row * stride));
         if (data == nullptr) {
             throw std::runtime_error("Cannot allocate memory for matrix.");
         }
@@ -152,7 +189,7 @@ public:
         }
         if (row * col != m.row * m.col) {
             delete[] data;
-            data = (char*)memalign(ALIGNMENT, m.row * m.stride);
+            data = static_cast<char*>(memalign(ALIGNMENT, m.row * m.stride));
         }
         memcpy(data, m.data, m.row * m.stride);
         row = m.row;
@@ -167,27 +204,21 @@ public:
     }
 
     void
-    load(const std::string& path, unsigned int skip = 0, unsigned int gap = 4) {
+    load(const std::string& path) {
         logger << "Loading data from " << path << std::endl;
         std::ifstream is(path.c_str(), std::ios::binary);
         if (!is) {
             throw std::runtime_error("Cannot open file " + path);
         }
-        is.seekg(0, std::ios::end);
-        size_t size = is.tellg();
-        size -= skip;
-        is.seekg(0, std::ios::beg);
-        unsigned dim;
-        is.read((char*)&dim, sizeof(unsigned int));
-        logger << "Vector dimension: " << dim << std::endl;
-        unsigned line = sizeof(T) * dim + gap;
-        unsigned N = size / line;
-        reset(N, dim);
-        zero();
-        is.seekg(skip, std::ios::beg);
-        for (unsigned i = 0; i < N; ++i) {
-            is.seekg(gap, std::ios::cur);
-            is.read(&data[stride * i], sizeof(T) * dim);
+
+        if (path.find(".bin") != std::string::npos) {
+            load_bin_data(is);
+        } else if (path.find(".fvecs") != std::string::npos || path.find(".ivecs") != std::string::npos) {
+            load_vecs_data(is, 0, 4);
+        } else if (path.find(".hdf5") != std::string::npos) {
+            load_hdf5_data(is);
+        } else {
+            throw std::runtime_error("Unsupported file format: " + path);
         }
     }
 
@@ -211,16 +242,16 @@ public:
     }
 
     /**
-             * Append a list of matrices to the current matrix.
-             * @param matrices std::vector<Matrix>
-             */
+     * Append a list of matrices to the current matrix.
+     * @param matrices std::vector<Matrix>
+     */
     void
     append(const std::vector<Matrix>& matrices) {
         size_t new_rows = row;
         for (const auto& matrix : matrices) {
             new_rows += matrix.row;
         }
-        char* new_data = (char*)memalign(32, new_rows * stride);
+        auto new_data = static_cast<char*>(memalign(32, new_rows * stride));
         memcpy(new_data, data, row * stride);
         size_t offset = row * stride;
         for (const auto& matrix : matrices) {
@@ -233,16 +264,16 @@ public:
     }
 
     /**
-             * Append a list of matrices to the current matrix.
-             * @param matrices std::vector<std::shared_ptr<Matrix>>
-             */
+     * Append a list of matrices to the current matrix.
+     * @param matrices std::vector<std::shared_ptr<Matrix>>
+     */
     void
     append(const std::vector<std::shared_ptr<Matrix>>& matrices) {
         size_t new_rows = row;
         for (const auto& matrix : matrices) {
             new_rows += matrix->row;
         }
-        char* new_data = (char*)memalign(32, new_rows * stride);
+        auto new_data = static_cast<char*>(memalign(32, new_rows * stride));
         memcpy(new_data, data, row * stride);
         size_t offset = row * stride;
         for (const auto& matrix : matrices) {
@@ -255,12 +286,12 @@ public:
     }
 
     /**
-             * Split the matrix into num parts. Note that the original matrix will be resized but not freed.
-             * @param num The number of parts to split.
-             * @return
-             */
+     * Split the matrix into num parts. Note that the original matrix will be resized but not freed.
+     * @param num The number of parts to split.
+     * @return
+     */
     std::vector<Matrix>
-    split(size_t num) {
+    split(const size_t num) {
         size_t new_rows = row / num;
         size_t remaining = row % num;
         size_t new_columns = col;
@@ -288,9 +319,9 @@ public:
         size_t new_rows = row / 2;
         row = new_rows;
 
-        char* tmp = (char*)memalign(32, new_rows * stride);
+        auto tmp = static_cast<char*>(memalign(32, new_rows * stride));
         memcpy(tmp, data, new_rows * stride);
-        char* new_data = (char*)memalign(32, (total - new_rows) * stride);
+        char* new_data = static_cast<char*>(memalign(32, (total - new_rows) * stride));
         memcpy(new_data, data + new_rows * stride, (total - new_rows) * stride);
         free(data);
         data = tmp;
@@ -315,7 +346,7 @@ mergeMatrix(const Matrix<T>& m1, const Matrix<T>& m2, Matrix<T>& merged) {
     }
 
     if (&m1 == &merged) {
-        Matrix temp(m1);
+        Matrix<T> temp(m1);
         merged.resize(r1 + r2, c);
         for (size_t i = 0; i < r1; ++i) {
             std::copy(temp[i], temp[i] + c, merged[i]);
@@ -397,7 +428,7 @@ public:
     }
 
     T const*
-    operator[](unsigned i) const {
+    operator[](const unsigned i) const {
 #ifdef USE_SSE
         _mm_prefetch(data + stride * i, _MM_HINT_T0);
 #endif

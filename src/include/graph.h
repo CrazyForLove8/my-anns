@@ -266,6 +266,9 @@ saveHGraph(HGraph& hgraph, const std::string& filename);
 
 void
 loadGraph(Graph& graph, const std::string& filename);
+
+void
+loadHGraph(HGraph& hgraph, const std::string& filename);
 }  // namespace graph
 
 #endif  // MYANNS_GRAPH_H

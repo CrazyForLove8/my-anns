@@ -5,6 +5,7 @@
 #ifndef MYANNS_ANNSLIB_H
 #define MYANNS_ANNSLIB_H
 
+#include "output.h"
 #include "evaluator.h"
 #include "fgim.h"
 #include "hnsw.h"

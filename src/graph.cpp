@@ -523,24 +523,6 @@ graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
             levels[j] = std::max(levels[j], i);
         }
     }
-
-    file << hgraph.size() << std::endl;
-    for (size_t i = 0; i < hgraph[0].size(); ++i) {
-        file << i << " " << levels[i] << std::endl;
-        for (int j = 0; j <= levels[i]; ++j) {
-            auto& graph = hgraph[j];
-            if (graph[i].candidates_.empty()) {
-                continue;
-            }
-            file << j << " " << graph[i].candidates_.size() << " ";
-            for (auto& neighbor : graph[i].candidates_) {
-                file << neighbor.id << " ";
-            }
-        }
-        file << std::endl;
-    }
-
-    file.close();
 }
 
 void
@@ -568,6 +550,87 @@ graph::loadGraph(Graph& graph, const std::string& filename) {
     }
     file.close();
 }
+
+void
+graph::loadHGraph(HGraph& hgraph, const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open the file: " + filename);
+    }
+
+    std::string line;
+    int num_levels = 0;
+
+    if (std::getline(file, line)) {
+        std::istringstream iss(line);
+        iss >> num_levels;
+    } else {
+        file.close();
+        return;
+    }
+
+    std::vector<std::pair<int, int>> node_levels_info;
+    int max_node_id = -1;
+
+    for (int i = 0; i < num_levels; ++i) {
+        if (std::getline(file, line)) {
+            std::istringstream iss(line);
+            int node_id, level;
+            iss >> node_id >> level;
+            node_levels_info.emplace_back(node_id, level);
+            if (node_id > max_node_id) {
+                max_node_id = node_id;
+            }
+        } else {
+            file.close();
+            return;
+        }
+    }
+
+    int num_nodes = max_node_id + 1;
+    hgraph.resize(num_levels, std::vector<Neighborhood>(num_nodes));
+
+    file.clear();
+    file.seekg(0, std::ios::beg);
+
+    std::getline(file, line);
+
+    for (int i = 0; i < num_nodes; ++i) {
+        if (std::getline(file, line)) {
+            std::istringstream iss(line);
+            int current_node_id, max_level_for_node;
+            iss >> current_node_id >> max_level_for_node;
+
+            for (int j = 0; j <= max_level_for_node; ++j) {
+                if (std::getline(file, line)) {
+                    std::istringstream candidate_iss(line);
+                    int level_idx, num_candidates;
+                    candidate_iss >> level_idx >> num_candidates;
+                    if (current_node_id >= hgraph[level_idx].size()) {
+                        for(auto& level_vec : hgraph) {
+                            level_vec.resize(current_node_id + 1);
+                        }
+                    }
+
+                    for (int k = 0; k < num_candidates; ++k) {
+                        int candidate_id;
+                        candidate_iss >> candidate_id;
+                        hgraph[level_idx][current_node_id].candidates_.emplace_back(candidate_id, 0.0f, false);
+                    }
+                } else {
+                    file.close();
+                    return;
+                }
+            }
+        } else {
+            file.close();
+            return;
+        }
+    }
+
+    file.close();
+}
+
 
 int
 graph::checkConnectivity(const Graph& graph) {
