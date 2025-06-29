@@ -87,19 +87,12 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             search_Ls = {
                 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600};
         } else {
-            for (int i = 50; i <= 100; i += 5) {
+            for (int i = 20; i <= 100; i += 5) {
                 search_Ls.push_back(i);
             }
-            //            for (int i = 200; i <= 800; i += 100) {
-            //                search_Ls.push_back(i);
-            //            }
-            for (int i = 100; i <= 500; i += 10) {
+            for (int i = 100; i <= 800; i += 10) {
                 search_Ls.push_back(i);
             }
-            //            for (int i = 200; i <= 600; i += 30) {
-            //                search_Ls.push_back(i);
-            //            }
-            logger << "Search L is gap 5 from 100 to 250" << std::endl;
         }
     } else {
         search_Ls = {search_L};

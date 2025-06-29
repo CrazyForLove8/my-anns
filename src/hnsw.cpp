@@ -4,9 +4,6 @@ using namespace graph;
 
 hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
     : max_neighbors_(max_neighbors),
-      max_level_(0),
-      enter_point_(0),
-      cur_max_level_(0),
       max_base_neighbors_(max_neighbors * 2),
       ef_construction_(ef_construction),
       Index(dataset, false) {
@@ -16,6 +13,43 @@ hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
 
     levels.reserve(oracle_->size());
     levels.resize(oracle_->size(), 0);
+
+    logger << "Building HNSW index with parameters:" << std::endl;
+    logger << "max_neighbors: " << max_neighbors_ << std::endl;
+    logger << "ef_construction: " << ef_construction_ << std::endl;
+    logger << "dataset size: " << oracle_->size() << std::endl;
+
+    int total = oracle_->size();
+
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    for (int i = 0; i < total; i++) {
+        levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels[i]);
+    }
+
+    graph_.reserve(max_level_ + 1);
+    for (int i = 0; i <= max_level_; ++i) {
+        graph_.emplace_back(total);
+    }
+}
+
+hnsw::HNSW::HNSW(DatasetPtr& dataset, HGraph& graph) : Index(dataset, false), graph_(std::move(graph)) {
+    for (int i = graph.size() - 1; i >= 0 ; --i){
+        bool found = false;
+        for (int j = 0; j < graph[i].size(); ++j) {
+            if (!graph[i][j].candidates_.empty()) {
+                enter_point_ = j;
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            cur_max_level_ = max_level_ = i;
+            break;
+        }
+    }
+    flatten_graph_ = FlattenHGraph(graph_);
+    built_ = true;
 }
 
 int
@@ -323,30 +357,70 @@ hnsw::HNSW::extractHGraph() {
 
 void
 hnsw::HNSW::build_internal() {
-    logger << "Building HNSW index with parameters:" << std::endl;
-    logger << "max_neighbors: " << max_neighbors_ << std::endl;
-    logger << "ef_construction: " << ef_construction_ << std::endl;
-    logger << "dataset size: " << oracle_->size() << std::endl;
-
-    int total = oracle_->size();
-
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    for (int i = 0; i < total; i++) {
-        levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
-        max_level_ = std::max(max_level_, levels[i]);
-    }
-
-    graph_.reserve(max_level_ + 1);
-    for (int i = 0; i <= max_level_; ++i) {
-        graph_.emplace_back(total);
-    }
-
+    int total = (int)oracle_->size();
 #pragma omp parallel for schedule(dynamic)
     for (int i = 1; i < total; ++i) {
         if (i % 10000 == 0) {
             logger << "Adding " << i << " / " << total << std::endl;
         }
         addPoint(i);
+    }
+}
+
+void
+hnsw::HNSW::partial_build(int start, int end) {
+    if (start < 0 || end > oracle_->size() || start >= end) {
+        throw std::invalid_argument("Invalid range for partial build");
+    }
+    logger << "Adding from " << start << " to " << end << std::endl;
+    Timer timer;
+    timer.start();
+#pragma omp parallel for schedule(dynamic)
+    for (int i = start; i < end; ++i) {
+        if (i % 10000 == 0) {
+            logger << "Adding " << i << " / " << end << std::endl;
+        }
+        addPoint(i);
+    }
+    timer.end();
+    logger << "Indexing time: " << timer.elapsed() << "s" << std::endl;
+    cur_size_ += end - start;
+    if (cur_size_ == oracle_->size()) {
+        flatten_graph_ = FlattenHGraph(graph_);
+        built_ = true;
+    } else {
+        built_ = false;
+    }
+}
+
+void
+hnsw::HNSW::partial_build(int num) {
+    if (num <= 0 || num > oracle_->size()) {
+        throw std::invalid_argument("Invalid number of points for partial build");
+    }
+    int start = cur_size_, end = cur_size_ == 1 ? num : cur_size_ + num;
+    logger << "Adding from " << start << " to " << end << std::endl;
+    Timer timer;
+    timer.start();
+#pragma omp parallel for schedule(dynamic)
+    for (int i = start; i < end; ++i) {
+        if (i % 10000 == 0) {
+            logger << "Adding " << i << " / " << end << std::endl;
+        }
+        addPoint(i);
+    }
+    timer.end();
+    logger << "Adding time: " << timer.elapsed() << "s" << std::endl;
+    if (cur_size_ == 1) {
+        cur_size_ = num;
+    }else {
+        cur_size_ += num;
+    }
+    if (cur_size_ == oracle_->size()) {
+        flatten_graph_ = FlattenHGraph(graph_);
+        built_ = true;
+    } else {
+        built_ = false;
     }
 }
 

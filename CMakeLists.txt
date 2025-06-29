@@ -11,7 +11,7 @@ else ()
     message(FATAL_ERROR "Please install OpenMP")
 endif ()
 
-SET(CMAKE_CXX_FLAGS "-std=c++17 -DNDEBUG -march=native -fpic -DHAVE_CXX0X -fopenmp -ftree-vectorize -Ofast -march=native -msse4.2 -mavx2 -mfma")
+SET(CMAKE_CXX_FLAGS "-std=c++17 -DNDEBUG -fpic -DHAVE_CXX0X -fopenmp -ftree-vectorize -Ofast -march=native -msse4.2 -mavx2 -mfma")
 
 #option(ENABLE_ADDRESS_SANITIZER "Enable AddressSanitizer for memory error detection" OFF)
 #if (ENABLE_ADDRESS_SANITIZER)

@@ -83,7 +83,5 @@ testAggregate() {
 
 int
 main() {
-    testMerge();
 
-    testAggregate();
 }

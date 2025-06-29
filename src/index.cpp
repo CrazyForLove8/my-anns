@@ -20,6 +20,16 @@ Index::Index(DatasetPtr& dataset, bool allocate)
     }
 }
 
+Index::Index(DatasetPtr& dataset, Graph& graph) :
+    dataset_(dataset),
+    oracle_(dataset->getOracle()),
+    base_(dataset->getBasePtr()),
+    visited_list_pool_(dataset->getVisitedListPool()),
+    graph_(std::move(graph)),
+    built_(true) {
+    flatten_graph_ = FlattenGraph(graph_);
+}
+
 void
 Index::build_internal() {
     throw std::runtime_error("Index does not support build");

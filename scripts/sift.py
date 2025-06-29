@@ -1,18 +1,34 @@
-import numpy as np
-from pyrsistent import b
 from vecs_util import *
 
-base_path = "/root/datasets/sift/1m/sift_base.fvecs"
+base_path = "/root/mount/dataset/siftsmall/siftsmall_base.fvecs"
+query_path = "/root/mount/dataset/siftsmall/siftsmall_query.fvecs"
+gt_path = "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs"
 
-print("Reading base and query")
-base = fvecs_read(base_path)
+# check_fvecs_file(base_path)
 
-print("base:" + str(base.shape))
+# print("Reading base and query")
+# base = fvecs_read_single_dim_header(base_path)
+# query = fvecs_read_single_dim_header(query_path)
+#
+# print("base:" + str(base.shape))
+#
+# indices, distances = calculate_gt(base, query, 100, metric='euclidean')
+#
+# print("indices shape: " + str(indices.shape))
+# print("distances shape: " + str(distances.shape))
+# print("Saving indices and distances")
+# write_ivecs(indices, gt_path)
 
-print("Divide into 2 parts")
-base1 = base[:500000]
-base2 = base[500000:]
+if __name__ == "__main__":
+    print("Reading base and query")
+    base = fvecs_read(base_path)
+    query = fvecs_read(query_path)
 
-print("save")
-write_fvecs(base1, "/root/datasets/sift/1m/2/sift_base1.fvecs")
-write_fvecs(base2, "/root/datasets/sift/1m/2/sift_base2.fvecs")
+    print("base:" + str(base.shape))
+
+    indices, distances = calculate_gt(base, query, 100, metric='euclidean')
+
+    print("indices shape: " + str(indices.shape))
+    print("distances shape: " + str(distances.shape))
+    print("Saving indices and distances")
+    write_ivecs(indices, gt_path)

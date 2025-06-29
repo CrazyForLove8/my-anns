@@ -79,13 +79,13 @@ public:
     }
 
     /**
-                   * Redirect the output to a file
-                   * @param filename A string to specify the filename, if empty, the default
-                   * filename will be used. Note that the extension is default to be added as
-                   * .txt
-                   */
+   * Redirect the output to a file
+   * @param filename A string to specify the filename, if empty, the default
+   * filename will be used. Note that the extension is default to be added as
+   * .txt
+   */
     static void
-    redirect(std::string filename = "");
+    redirect(const std::string& filename = "");
 
     ~Log();
 

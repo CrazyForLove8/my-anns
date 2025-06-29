@@ -319,15 +319,28 @@ testSimpleMerge() {
     }
 }
 
+void
+test_save() {
+    DatasetPtr dataset = Dataset::getInstance("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
+                                              "/root/mount/dataset/siftsmall/siftsmall_query.fvecs",
+                                              "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs",
+                                              DISTANCE::L2);
+    auto index = std::make_shared<diskann::Vamana>(dataset, 1.2, 200, 40);
+    index->build();
+
+    recall(index, dataset);
+    saveGraph(index->extractGraph(), "/root/mount/my-anns/output/siftsmall/vamana");
+
+    Graph graph;
+    loadGraph(graph, "/root/mount/my-anns/output/siftsmall/vamana");
+    auto index_ = std::make_shared<Index>(dataset, graph);
+    recall(index, dataset);
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    testSimpleMerge();
-
-    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
-    if (ret != 0) {
-        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
-    }
+    test_save();
     return 0;
 }

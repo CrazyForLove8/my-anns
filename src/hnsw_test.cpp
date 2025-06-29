@@ -197,15 +197,55 @@ hnsw_exp_extend_observation() {
     std::cout << "New cross / Total: " << new_cross / total << std::endl;
 }
 
+void
+test_save_and_load() {
+    Log::redirect("hnsw_build_internet_search");
+    DatasetPtr dataset = Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
+        "/root/mount/dataset/internet_search/internet_search_test.fbin",
+        "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
+                                              DISTANCE::L2);
+    auto index = std::make_shared<HNSW>(dataset, 32, 200);
+    index->build();
+
+    logger << "HNSW index built successfully" << std::endl;
+    recall(index, dataset);
+    logger << "Saving HNSW index to disk" << std::endl;
+    saveHGraph(index->extractHGraph(), "/root/mount/my-anns/internet/hnsw_internet_search");
+    logger << "HNSW index saved successfully" << std::endl;
+
+    HGraph hgraph;
+    logger << "Loading HNSW index from disk" << std::endl;
+    loadHGraph(hgraph, "/root/mount/my-anns/internet/hnsw_internet_search");
+    logger << "HNSW index loaded successfully" << std::endl;
+    auto index_ = std::make_shared<HNSW>(dataset, hgraph);
+    logger << "HNSW index created from loaded graph" << std::endl;
+    recall(index, dataset);
+}
+
+void
+test_partial_build() {
+    DatasetPtr dataset = Dataset::getInstance("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
+                                              "/root/mount/dataset/siftsmall/siftsmall_query.fvecs",
+                                              "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs",
+                                              DISTANCE::L2);
+    auto index = std::make_shared<HNSW>(dataset, 32, 200);
+    int split = 3;
+    int size =  dataset->getOracle()->size() / split;
+    int remainder = dataset->getOracle()->size() % split;
+    for (int i = 0 ; i < split; ++i) {
+        if (i == split - 1) {
+            size += remainder;
+        }
+        index->partial_build(size);
+    }
+    logger << "HNSW index built successfully" << std::endl;
+    recall(index, dataset);
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    testBuild();
-
-    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
-    if (ret != 0) {
-        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
-    }
+    test_partial_build();
     return 0;
 }

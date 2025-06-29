@@ -44,6 +44,8 @@ public:
 
     explicit Index(DatasetPtr& dataset, bool allocate = true);
 
+    explicit Index(DatasetPtr& dataset, Graph& graph);
+
     virtual ~Index() = default;
 
     virtual void

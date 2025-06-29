@@ -15,7 +15,7 @@ Dataset::getInstance(const std::string& name, const std::string& size) {
 std::shared_ptr<Dataset>
 Dataset::getInstance(const std::string& base_path, DISTANCE metric) {
     auto dataset = std::make_shared<Dataset>();
-    dataset->name_ = "custom";
+    dataset->name_ = base_path.substr(base_path.find_last_of("/\\") + 1, base_path.find_last_of('.') - base_path.find_last_of("/\\") - 1);
     dataset->size_ = "custom";
 
     dataset->base_->load(base_path);
@@ -47,7 +47,7 @@ Dataset::getInstance(const std::string& base_path,
                      const std::string& groundtruth_path,
                      DISTANCE metric) {
     auto dataset = std::make_shared<Dataset>();
-    dataset->name_ = "custom";
+    dataset->name_ = base_path.substr(base_path.find_last_of("/\\") + 1, base_path.find_last_of('.') - base_path.find_last_of("/\\") - 1);
     dataset->size_ = "custom";
 
     dataset->base_->load(base_path);
@@ -189,6 +189,13 @@ Dataset::split(std::vector<DatasetPtr>& datasets, unsigned int num) {
 
     datasets.reserve(num - 1);
     datasets.resize(num - 1);
+    /**
+    TODO dataset can be split without reallocating the base matrix
+    Currently, we just split the base matrix into num parts and delete the original base matrix
+    this is not efficient but works for now
+    we just return a pointer to control the size of the base matrix
+    e.g., dataset->getSubsets(num);
+    */
     auto matrices = base_->split(num);
     if (angular) {
         oracle_ = MatrixOracle<float, metric::angular>::getInstance(*base_);

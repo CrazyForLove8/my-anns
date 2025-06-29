@@ -211,7 +211,7 @@ public:
             throw std::runtime_error("Cannot open file " + path);
         }
 
-        if (path.find(".bin") != std::string::npos) {
+        if (path.find(".fbin") != std::string::npos) {
             load_bin_data(is);
         } else if (path.find(".fvecs") != std::string::npos || path.find(".ivecs") != std::string::npos) {
             load_vecs_data(is, 0, 4);
