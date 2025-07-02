@@ -11,8 +11,8 @@ hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
     random_engine_.seed(2024);
     reverse_ = 1 / log(1.0 * max_neighbors_);
 
-    levels.reserve(oracle_->size());
-    levels.resize(oracle_->size(), 0);
+    levels_.reserve(oracle_->size());
+    levels_.resize(oracle_->size(), 0);
 
     logger << "Building HNSW index with parameters:" << std::endl;
     logger << "max_neighbors: " << max_neighbors_ << std::endl;
@@ -23,8 +23,8 @@ hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
 
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
     for (int i = 0; i < total; i++) {
-        levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
-        max_level_ = std::max(max_level_, levels[i]);
+        levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels_[i]);
     }
 
     graph_.reserve(max_level_ + 1);
@@ -33,8 +33,16 @@ hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
     }
 }
 
-hnsw::HNSW::HNSW(DatasetPtr& dataset, HGraph& graph)
-    : Index(dataset, false), graph_(std::move(graph)) {
+hnsw::HNSW::HNSW(
+    DatasetPtr& dataset, HGraph& graph, bool partial, int max_neighbors, int ef_construction)
+    : Index(dataset, false),
+      graph_(std::move(graph)),
+      max_neighbors_(max_neighbors),
+      max_base_neighbors_(max_neighbors * 2),
+      ef_construction_(ef_construction) {
+    random_engine_.seed(2024);
+    reverse_ = 1 / log(1.0 * max_neighbors_);
+
     for (int i = graph.size() - 1; i >= 0; --i) {
         bool found = false;
         for (int j = 0; j < graph[i].size(); ++j) {
@@ -49,8 +57,29 @@ hnsw::HNSW::HNSW(DatasetPtr& dataset, HGraph& graph)
             break;
         }
     }
-    flatten_graph_ = FlattenHGraph(graph_);
-    built_ = true;
+
+    if (!partial) {
+        flatten_graph_ = FlattenHGraph(graph_);
+        built_ = true;
+    } else {
+        levels_.reserve(oracle_->size());
+        levels_.resize(oracle_->size(), 0);
+        cur_size_ = graph_[0].size();
+
+        int total = oracle_->size();
+
+        std::uniform_real_distribution<double> distribution(0.0, 1.0);
+        for (int i = cur_size_; i < total; i++) {
+            levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+            max_level_ = std::max(max_level_, levels_[i]);
+        }
+
+        graph_.reserve(max_level_ + 1);
+        graph_.resize(max_level_ + 1);
+        for (int i = 0; i <= max_level_; ++i) {
+            graph_[i].resize(total);
+        }
+    }
 }
 
 int
@@ -76,7 +105,7 @@ void
 hnsw::HNSW::addPoint(unsigned int index) {
     std::lock_guard<std::mutex> guard(graph_[0][index].lock_);
 
-    int level = levels[index];
+    int level = levels_[index];
     std::unique_lock<std::mutex> graph_lock(graph_lock_);
     int max_level_copy = cur_max_level_;
     if (level <= max_level_copy) {
@@ -260,6 +289,12 @@ hnsw::HNSW::print_info() const {
     logger << "Max Base Neighbors: " << max_base_neighbors_ << std::endl;
     logger << "EF Construction: " << ef_construction_ << std::endl;
     logger << "Max Level: " << max_level_ << std::endl;
+
+    if (max_neighbors_ == 0 || max_base_neighbors_ == 0 || ef_construction_ == 0) {
+        logger << "Warning: max_neighbors, max_base_neighbors, and ef_construction should be "
+                  "greater than 0."
+               << std::endl;
+    }
 }
 
 Graph&
@@ -289,8 +324,8 @@ hnsw::HNSW::build_internal() {
 }
 
 void
-hnsw::HNSW::partial_build(int start, int end) {
-    if (start < 0 || end > oracle_->size() || start >= end) {
+hnsw::HNSW::partial_build(uint64_t start, uint64_t end) {
+    if (end > oracle_->size() || start >= end) {
         throw std::invalid_argument("Invalid range for partial build");
     }
     print_info();
@@ -298,7 +333,7 @@ hnsw::HNSW::partial_build(int start, int end) {
     Timer timer;
     timer.start();
 #pragma omp parallel for schedule(dynamic)
-    for (int i = start; i < end; ++i) {
+    for (auto i = start; i < end; ++i) {
         if (i % 10000 == 0) {
             logger << "Adding " << i << " / " << end << std::endl;
         }
@@ -316,21 +351,32 @@ hnsw::HNSW::partial_build(int start, int end) {
 }
 
 void
-hnsw::HNSW::partial_build(int num) {
-    if (num <= 0 || num > oracle_->size()) {
-        throw std::invalid_argument("Invalid number of points for partial build");
-    }
+hnsw::HNSW::partial_build(uint64_t num) {
     print_info();
-    int start = cur_size_, end = cur_size_ == 1 ? num : cur_size_ + num;
+    auto start = cur_size_, end = cur_size_ == 1 ? num : cur_size_ + num;
+    if (num == 0) {
+        end = oracle_->size();
+        num = end - start;
+        if (num == 0) {
+            logger << "No points to add, skipping build." << std::endl;
+            return;
+        }
+    }
+
+    if (end > oracle_->size()) {
+        throw std::invalid_argument("Invalid range for partial build");
+    }
     logger << "Adding from " << start << " to " << end << std::endl;
     Timer timer;
     timer.start();
+    {
 #pragma omp parallel for schedule(dynamic)
-    for (int i = start; i < end; ++i) {
-        if (i % 10000 == 0) {
-            logger << "Adding " << i << " / " << end << std::endl;
+        for (auto i = start; i < end; ++i) {
+            if (i % 100000 == 0) {
+                logger << "Adding " << i << " / " << end << std::endl;
+            }
+            addPoint(i);
         }
-        addPoint(i);
     }
     timer.end();
     logger << "Adding time: " << timer.elapsed() << "s" << std::endl;
@@ -380,11 +426,11 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
     auto cur_size = oracle_->size();
     auto total = dataset->getOracle()->size() + cur_size;
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    levels.reserve(total);
-    levels.resize(total);
+    levels_.reserve(total);
+    levels_.resize(total);
     for (auto i = cur_size; i < total; i++) {
-        levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
-        max_level_ = std::max(max_level_, levels[i]);
+        levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels_[i]);
     }
     graph_.resize(max_level_ + 1);
     for (auto& level : graph_) {
@@ -413,7 +459,8 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
 
 void
 hnsw::HNSW::set_max_neighbors(int max_neighbors) {
-    this->max_neighbors_ = max_neighbors;
+    max_neighbors_ = max_neighbors;
+    max_base_neighbors_ = max_neighbors * 2;
     reverse_ = 1 / log(1.0 * max_neighbors_);
 }
 

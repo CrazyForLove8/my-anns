@@ -21,6 +21,8 @@ protected:
 
     float sample_rate_;
 
+    std::vector<size_t> offsets_;
+
     virtual void
     CrossQuery(std::vector<IndexPtr>& indexes);
 
@@ -38,6 +40,9 @@ protected:
 
     void
     connect_no_indegree(Graph& graph);
+
+    bool
+    are_in_same_index(size_t id1, size_t id2) const;
 
 public:
     static constexpr unsigned ITER_MAX = 30;

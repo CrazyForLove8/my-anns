@@ -22,6 +22,7 @@
 #include <random>
 #include <stack>
 
+#include "dataset.h"
 #include "dtype.h"
 #include "visittable.h"
 
@@ -256,17 +257,17 @@ search(IndexOracle<float>* oracle,
 int
 checkConnectivity(const Graph& graph);
 
-void
+std::string
 saveGraph(Graph& graph, const std::string& filename);
 
-void
+std::string
 saveHGraph(HGraph& hgraph, const std::string& filename);
 
 void
-loadGraph(Graph& graph, const std::string& filename);
+loadGraph(Graph& graph, const std::string& index_path, const OraclePtr& oracle = nullptr);
 
 void
-loadHGraph(HGraph& hgraph, const std::string& filename);
+loadHGraph(HGraph& hgraph, const std::string& index_path, const OraclePtr& oracle = nullptr);
 }  // namespace graph
 
 #endif  // MYANNS_GRAPH_H

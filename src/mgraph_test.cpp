@@ -440,12 +440,5 @@ main() {
 
     mergeExp6_2(dataset);
 
-#ifdef _WIN32 | __linux__
-    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
-    if (ret != 0) {
-        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
-    }
-#endif
-
     return 0;
 }

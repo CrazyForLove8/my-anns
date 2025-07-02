@@ -465,34 +465,47 @@ get_path(std::string filename) {
     if (filename.find(".bin") == std::string::npos) {
         filename += ".bin";
     }
-    if (std::filesystem::path(filename).is_absolute()) {
-        std::filesystem::path p(filename);
-        if (!p.parent_path().empty() && !std::filesystem::exists(p.parent_path())) {
-            std::filesystem::create_directories(p.parent_path());
+    std::filesystem::path p(filename);
+    if (p.is_absolute()) {
+        std::filesystem::path parent_dir = p.parent_path();
+        std::string stem = p.stem().string();
+        std::string extension = p.extension().string();
+
+        if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
+            std::filesystem::create_directories(parent_dir);
+        }
+
+        if (std::filesystem::exists(p)) {
+            std::mt19937 rng(std::random_device{}());
+            std::string new_relative_filename = stem + "_" + std::to_string(rng()) + extension;
+            filename = (parent_dir / new_relative_filename).string();
+        } else {
+            filename = p.string();
         }
         return filename;
+    }
+    if (!std::filesystem::exists(graph_output_dir)) {
+        std::filesystem::create_directories(graph_output_dir);
+    }
+    std::filesystem::path pp(graph_output_dir + filename);
+    if (std::filesystem::exists(pp)) {
+        std::mt19937 rng(std::random_device{}());
+        filename = pp.stem().string() + "_" + std::to_string(rng()) + pp.extension().string();
     }
     return graph_output_dir + filename;
 }
 
-void
+std::string
 graph::saveGraph(Graph& graph, const std::string& filename) {
     if (graph.empty()) {
-        return;
+        return "";
     }
     auto path = get_path(filename);
     std::ofstream file(path, std::ios::out | std::ios::binary);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open the file");
     }
-    std::ifstream checkFile(path, std::ios::ate | std::ios::binary);
-    if (checkFile && checkFile.tellg() != 0) {
-        file.close();
-        std::mt19937 rng(std::random_device{}());
-        std::string new_filename = filename + "_" + std::to_string(rng());
-        file = std::ofstream(get_path(new_filename));
-    }
-    checkFile.close();
+    logger << "Saving graph to " << path << std::endl;
 
     size_t graph_size = graph.size();
     file.write(reinterpret_cast<const char*>(&graph_size), sizeof(graph_size));
@@ -506,15 +519,16 @@ graph::saveGraph(Graph& graph, const std::string& filename) {
         }
     }
     file.close();
+    return path;
 }
 
 void
-graph::loadGraph(Graph& graph, const std::string& filename) {
-    const std::string full_filepath = get_path(filename);
-    std::ifstream file(full_filepath, std::ios::in | std::ios::binary);
+graph::loadGraph(Graph& graph, const std::string& index_path, const OraclePtr& oracle) {
+    std::ifstream file(index_path, std::ios::in | std::ios::binary);
 
+    logger << "Loading graph from " << index_path << std::endl;
     if (!file.is_open()) {
-        throw std::runtime_error("Cannot open the file for reading: " + full_filepath);
+        throw std::runtime_error("Cannot open the file for reading: " + index_path);
     }
 
     size_t graph_size;
@@ -535,27 +549,27 @@ graph::loadGraph(Graph& graph, const std::string& filename) {
         }
     }
     file.close();
+
+    if (oracle != nullptr) {
+        for (size_t i = 0; i < graph.size(); ++i) {
+            for (auto& c : graph[i].candidates_) {
+                c.distance = (*oracle)(i, c.id);
+            }
+        }
+    }
 }
 
-void
+std::string
 graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
     if (hgraph.empty()) {
         logger << "HGraph is empty, nothing to save." << std::endl;
-        return;
+        return "";
     }
     std::string full_filepath = get_path(filename);
     std::ofstream file(full_filepath, std::ios::out | std::ios::binary);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open the file");
     }
-    std::ifstream checkFile(full_filepath, std::ios::ate);
-    if (checkFile && checkFile.tellg() != 0) {
-        file.close();
-        std::mt19937 rng(std::random_device{}());
-        std::string new_filename = filename + "_" + std::to_string(rng());
-        file = std::ofstream(get_path(new_filename));
-    }
-    checkFile.close();
 
     std::vector<int> levels(hgraph[0].size(), 0);
     for (int i = hgraph.size() - 1; i >= 0; --i) {
@@ -569,7 +583,7 @@ graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
 
     int64_t graph_size = hgraph[0].size();
     int64_t max_level = hgraph.size() - 1;
-    logger << "Saving HGraph to " << get_path(filename) << std::endl;
+    logger << "Saving HGraph to " << full_filepath << std::endl;
     logger << "Graph size: " << graph_size << ", Max level: " << max_level << std::endl;
     file.write(reinterpret_cast<const char*>(&graph_size), sizeof(graph_size));
     file.write(reinterpret_cast<const char*>(&max_level), sizeof(max_level));
@@ -586,15 +600,15 @@ graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
         }
     }
     file.close();
+    return full_filepath;
 }
 
 void
-graph::loadHGraph(HGraph& hgraph, const std::string& filename) {
-    std::string full_filepath = get_path(filename);
-    std::ifstream file(full_filepath, std::ios::in | std::ios::binary);
+graph::loadHGraph(HGraph& hgraph, const std::string& index_path, const OraclePtr& oracle) {
+    std::ifstream file(index_path, std::ios::in | std::ios::binary);
 
     if (!file.is_open()) {
-        throw std::runtime_error("Cannot open the file for reading: " + full_filepath);
+        throw std::runtime_error("Cannot open the file for reading: " + index_path);
     }
 
     int64_t graph_size, max_level;
@@ -606,7 +620,7 @@ graph::loadHGraph(HGraph& hgraph, const std::string& filename) {
         hgraph[i].resize(graph_size);
     }
 
-    logger << "Loading HGraph from " << full_filepath << std::endl;
+    logger << "Loading HGraph from " << index_path << std::endl;
     logger << "Graph size: " << graph_size << ", Max level: " << max_level << std::endl;
     for (int i = 0; i < graph_size; ++i) {
         int64_t node_id;
@@ -624,6 +638,16 @@ graph::loadHGraph(HGraph& hgraph, const std::string& filename) {
         }
     }
     file.close();
+
+    if (oracle != nullptr) {
+        for (int i = 0; i < static_cast<int>(hgraph.size()); ++i) {
+            for (int j = 0; j < static_cast<int>(hgraph[i].size()); ++j) {
+                for (auto& c : hgraph[i][j].candidates_) {
+                    c.distance = (*oracle)(j, c.id);
+                }
+            }
+        }
+    }
 }
 
 int

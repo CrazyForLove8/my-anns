@@ -16,110 +16,54 @@ FGIM::FGIM(DatasetPtr& dataset, unsigned int max_degree, float sample_rate, bool
       sample_rate_(sample_rate) {
 }
 
-//Graph
-//FGIM::merge(
-//        const Graph &g1,
-//        OraclePtr &oracle1,
-//        const Graph &g2,
-//        OraclePtr &oracle2,
-//        OraclePtr &oracle) {
-//    Timer timer;
-//    timer.start();
-//
-//    Graph graph(g1.size() + g2.size());
-//
-//    Sampling(graph, g1, g2, oracle1, oracle2, oracle);
-//
-//    Refinement(graph, oracle);
-//
-//    timer.end();
-//    logger << "Merging time: " << timer.elapsed() << "s" << std::endl;
-//    return graph;
-//}
-//
-//void
-//FGIM::Sampling(Graph &graph,
-//               const Graph &g1,
-//               const Graph &g2,
-//               OraclePtr &oracle1,
-//               OraclePtr &oracle2,
-//               OraclePtr &oracle) {
-//    auto total = graph.size();
-//    auto _gs1 = g1.size();
-//    auto _gs2 = g2.size();
-//    FlattenGraph fg1(g1), fg2(g2);
-//
-//#pragma omp parallel for schedule(dynamic, 256)
-//    for (size_t u = 0; u < total; ++u) {
-//        if (u % 10000 == 0) {
-//            logger << "Processing " << u << "/" << total << std::endl;
-//        }
-//        auto data = (*oracle)[u];
-//        graph[u].M_ = max_degree_;
-//        graph[u].candidates_.reserve(max_degree_);
-//        if (u < _gs1) {
-//            auto &neighbors = g1[u].candidates_;
-//            std::copy(neighbors.begin(), neighbors.end(), std::back_inserter(graph[u].candidates_));
-//            if (graph[u].candidates_.size() > max_degree_) {
-//                graph[u].candidates_.resize(max_degree_);
-//            }
-//            std::make_heap(graph[u].candidates_.begin(), graph[u].candidates_.end());
-//            // TODO search
-////            auto result = search(oracle2.get(), fg2, data, L_, _gs2, L_);
-////            for (auto &&res: result) {
-////                graph[u].pushHeap(res.id + _gs1, res.distance);
-////            }
-//        } else {
-//            auto &neighbors = g2[u - _gs1].candidates_;
-//            for (const auto &neighbor: neighbors) {
-//                graph[u].candidates_.emplace_back(neighbor.id + _gs1, neighbor.distance, false);
-//            }
-//            if (graph[u].candidates_.size() > max_degree_) {
-//                graph[u].candidates_.resize(max_degree_);
-//            }
-//            std::make_heap(graph[u].candidates_.begin(), graph[u].candidates_.end());
-////            auto result = search(oracle1.get(), fg1, data, L_, _gs1, L_);
-////            for (auto&& res : result) {
-////                graph[u].pushHeap(res.id, res.distance);
-////            }
-//        }
-//    }
-//}
-
 void
 FGIM::update_neighbors(Graph& graph) {
+    // FIXME Segmentation Fault???
     size_t it = 0;
     unsigned samples = sample_rate_ * max_base_degree_;
-    // TODO Memory overhead is too high, 'new' 'old', 'reverse_new', 'reverse_old' can be removed
-#pragma omp parallel for
-    for (auto& u : graph) {
-        for (int v = (int)(u.candidates_.size() / 2); v < u.candidates_.size(); ++v) {
-            u.new_.emplace_back(u.candidates_[v].id);
-            u.candidates_[v].flag = false;
-        }
-    }
     while (++it && it <= ITER_MAX) {
         int cnt = 0;
 #pragma omp parallel
         {
             std::mt19937 rng(2024 + omp_get_thread_num());
+            std::vector<int> _old, _new;
+            _old.reserve(max_base_degree_ * 2);
+            _new.reserve(max_base_degree_ * 2);
 #pragma omp for reduction(+ : cnt) schedule(dynamic, 256)
             for (int vv = 0; vv < graph.size(); ++vv) {
                 auto& v = graph[vv];
-                auto& _old = v.old_;
-                auto& _new = v.new_;
+                _old.clear();
+                _new.clear();
+                for (auto& u : v.candidates_) {
+                    if (u.flag) {
+                        _new.emplace_back(u.id);
+                        {
+                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+                            graph[u.id].reverse_new_.emplace_back(vv);
+                        }
+                        u.flag = false;
+                    } else {
+                        _old.emplace_back(u.id);
+                        {
+                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+                            graph[u.id].reverse_old_.emplace_back(vv);
+                        }
+                    }
+                }
 
                 {
                     std::lock_guard<std::mutex> guard(v.lock_);
-                    auto& _r_old = v.reverse_old_;
-                    auto& _r_new = v.reverse_new_;
-                    if (!_r_old.empty()) {
-                        _old.insert(_old.end(), _r_old.begin(), _r_old.end());
-                        _r_old.clear();
+                    if (!v.reverse_old_.empty()) {
+                        _old.insert(_old.end(),
+                                    std::make_move_iterator(v.reverse_old_.begin()),
+                                    std::make_move_iterator(v.reverse_old_.end()));
+                        v.reverse_old_.clear();
                     }
-                    if (!_r_new.empty()) {
-                        _new.insert(_new.end(), _r_new.begin(), _r_new.end());
-                        _r_new.clear();
+                    if (!v.reverse_new_.empty()) {
+                        _new.insert(_new.end(),
+                                    std::make_move_iterator(v.reverse_new_.begin()),
+                                    std::make_move_iterator(v.reverse_new_.end()));
+                        v.reverse_new_.clear();
                     }
                 }
 
@@ -155,26 +99,6 @@ FGIM::update_neighbors(Graph& graph) {
                             dist < graph[_old[j]].candidates_.front().distance) {
                             cnt += graph[_new[i]].pushHeap(_old[j], dist);
                             cnt += graph[_old[j]].pushHeap(_new[i], dist);
-                        }
-                    }
-                }
-                _old.clear();
-                _new.clear();
-
-                //TODO The last iteration should not sample any more
-                for (auto& u : v.candidates_) {
-                    if (u.flag) {
-                        _new.emplace_back(u.id);
-                        {
-                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
-                            graph[u.id].reverse_new_.emplace_back(vv);
-                        }
-                        u.flag = false;
-                    } else {
-                        _old.emplace_back(u.id);
-                        {
-                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
-                            graph[u.id].reverse_old_.emplace_back(vv);
                         }
                     }
                 }
@@ -463,6 +387,22 @@ FGIM::connect_no_indegree(Graph& graph) {
     logger << "Connect " << cnt << " nodes" << std::endl;
 }
 
+bool
+FGIM::are_in_same_index(size_t id1, size_t id2) const {
+    if (offsets_.empty() || id1 >= offsets_.back() || id2 >= offsets_.back()) {
+        logger << "Error: Vector index out of bounds or empty offsets." << std::endl;
+        return false;
+    }
+
+    auto it1 = std::upper_bound(offsets_.begin(), offsets_.end(), id1);
+    size_t bucket_id1 = std::distance(offsets_.begin(), it1);
+
+    auto it2 = std::upper_bound(offsets_.begin(), offsets_.end(), id2);
+    size_t bucket_id2 = std::distance(offsets_.begin(), it2);
+
+    return bucket_id1 == bucket_id2;
+}
+
 void
 FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
     Timer timer;
@@ -482,7 +422,7 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
     }
 
     size_t offset = 0;
-    std::vector<size_t> offsets;
+    offsets_.clear();
     if (isHGraph) {
         for (auto& g : hgraphs) {
             auto& graph_ref = g.get();
@@ -498,7 +438,7 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
                                graph_[i + offset].candidates_.end());
             }
             offset += graph_ref[0].size();
-            offsets.emplace_back(offset);
+            offsets_.emplace_back(offset);
         }
     } else {
         for (auto& g : graphs) {
@@ -515,21 +455,22 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
                                graph_[i + offset].candidates_.end());
             }
             offset += graph_ref.size();
-            offsets.emplace_back(offset);
+            offsets_.emplace_back(offset);
         }
     }
 
     unsigned L = max_base_degree_ / (indexes.size() - 1);
 #pragma omp parallel for schedule(dynamic)
     for (int u = 0; u < oracle_->size(); ++u) {
-        auto cur_graph_idx = std::lower_bound(offsets.begin(), offsets.end(), u) - offsets.begin();
+        auto cur_graph_idx =
+            std::upper_bound(offsets_.begin(), offsets_.end(), u) - offsets_.begin();
         auto data = (*oracle_)[u];
 
         for (size_t graph_idx = 0; graph_idx < indexes.size(); graph_idx++) {
             if (graph_idx == cur_graph_idx) {
                 continue;
             }
-            auto _offset = graph_idx == 0 ? 0 : offsets[graph_idx - 1];
+            auto _offset = graph_idx == 0 ? 0 : offsets_[graph_idx - 1];
             auto& index = indexes[graph_idx];
             auto result = index->search(data, L, L);
             for (auto&& res : result) {

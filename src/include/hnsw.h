@@ -32,7 +32,7 @@ protected:
 
     uint64_t cur_size_{1};
 
-    std::vector<uint32_t> levels;
+    std::vector<uint32_t> levels_;
 
     double reverse_{};
 
@@ -75,7 +75,11 @@ public:
 
     HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
 
-    HNSW(DatasetPtr& dataset, HGraph& graph);
+    HNSW(DatasetPtr& dataset,
+         HGraph& graph,
+         bool partial = false,
+         int max_neighbors = 32,
+         int ef_construction = 200);
 
     ~HNSW() override = default;
 
@@ -89,10 +93,10 @@ public:
     build() override;
 
     void
-    partial_build(int start, int end);
+    partial_build(uint64_t start, uint64_t end);
 
     void
-    partial_build(int num);
+    partial_build(uint64_t num = 0);
 
     Graph&
     extractGraph() override;

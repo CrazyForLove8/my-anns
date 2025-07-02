@@ -96,8 +96,8 @@ Index::search(const float* query, unsigned int topk, unsigned int L) const {
 void
 Index::print_info() const {
     logger << "Indexing settings:" << std::endl;
-    logger << "  Dataset: " << dataset_->getName() << std::endl;
-    logger << "  Dataset Size: " << oracle_->size() << std::endl;
+    logger << "Dataset: " << dataset_->getName() << std::endl;
+    logger << "Dataset Size: " << oracle_->size() << std::endl;
 #pragma omp parallel
     {
 #pragma omp single

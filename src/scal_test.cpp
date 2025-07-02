@@ -10,8 +10,6 @@ get_dataset(const std::string& base_file,
         metric_type = DISTANCE::L2;
     } else if (metric == "cosine") {
         metric_type = DISTANCE::COSINE;
-    } else if (metric == "hamming") {
-        metric_type = DISTANCE::HAMMING;
     } else {
         throw std::invalid_argument("Unsupported metric type");
     }
@@ -22,114 +20,69 @@ get_dataset(const std::string& base_file,
     return Dataset::getInstance(base_file, query_file, gt_file, metric_type);
 }
 
-void
-restore_distance(HGraph& graph, DatasetPtr& dataset) {
-    auto& oracle = dataset->getOracle();
-    for (int i = 0; i < static_cast<int>(graph.size()); ++i) {
-        for (int j = 0; j < static_cast<int>(graph[i].size()); ++j) {
-            for (auto& c : graph[i][j].candidates_) {
-                c.distance = (*oracle)(j, c.id);
-            }
-        }
-    }
-}
+std::vector<std::string>
+build_sub_indexes(const DatasetPtr& dataset,
+                  const std::string& output_path,
+                  const int split_number,
+                  const int index_type = 0,
+                  const int max_neighbors = 32,
+                  const int ef_construction = 200,
+                  const float alpha = 1.2) {
+    auto datasets = dataset->subsets(split_number);
 
-void
-buildSubIndexes(const std::string& base_file,
-                const std::string& metric,
-                const std::string& output_path,
-                const int split_number) {
-    Log::setVerbose(true);
-    Log::redirect("/root/mount/my-anns/output/log");
-    auto dataset = get_dataset(base_file, metric);
-    auto datasets = std::vector<DatasetPtr>();
-    dataset->split(datasets, split_number);
-    datasets.insert(datasets.begin(), dataset);
-
+    std::vector<std::string> output_files;
     int part_id = 0;
-    std::string dataset_name = base_file.substr(base_file.find_last_of("/\\") + 1);
     for (auto& data : datasets) {
-        auto index = std::make_shared<hnsw::HNSW>(data, 32, 200);
-        index->build();
         std::string output_file = output_path + "/";
-        output_file +=
-            dataset_name + "_" + std::to_string(split_number) + "_" + std::to_string(part_id);
+        output_file += data->getName() + "_" + std::to_string(split_number) + "_" +
+                       std::to_string(index_type) + "_" + std::to_string(part_id);
         part_id++;
-        saveHGraph(index->extractHGraph(), output_file);
+        if (index_type == 0) {
+            auto index = std::make_shared<hnsw::HNSW>(data, max_neighbors, ef_construction);
+            index->build();
+            output_files.emplace_back(saveHGraph(index->extractHGraph(), output_file));
+        } else if (index_type == 1) {
+            auto index =
+                std::make_shared<diskann::Vamana>(data, alpha, ef_construction, max_neighbors);
+            index->build();
+            output_files.emplace_back(saveGraph(index->extractGraph(), output_file));
+        } else {
+            throw std::invalid_argument("Unsupported index type");
+        }
     }
+    return output_files;
 }
 
 void
-mergeSubindexes(const std::string& base_file,
-                const std::string& metric,
-                const std::vector<std::string>& subindex_files,
-                const std::string& output_path) {
-    auto dataset = get_dataset(base_file, metric);
-    auto datasets = std::vector<DatasetPtr>();
-    dataset->split(datasets, subindex_files.size());
-
+hnsw_add(DatasetPtr& dataset,
+         const std::string& index_file,
+         const int split_number,
+         const std::string& output_path,
+         const int num_threads = 48,
+         const int max_neighbors = 32,
+         const int ef_construction = 200) {
     HGraph hgraph;
-    loadHGraph(hgraph, subindex_files[0]);
-
-    restore_distance(hgraph, dataset);
-    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, hgraph);
-    hnsw->set_max_neighbors(32);
-    hnsw->set_ef_construction(200);
-
-    omp_set_num_threads(1);
-    for (auto& data : datasets) {
-        hnsw->add(data);
-    }
-
-    std::string output_file = output_path + "/";
-    std::string dataset_name = base_file.substr(base_file.find_last_of("/\\") + 1);
-    output_file += dataset_name + "_" + std::to_string(subindex_files.size()) + "_hnsw_add_1";
-    saveHGraph(hnsw->extractHGraph(), output_file);
-}
-
-void
-hnswAdd(const std::string& base_file,
-        const std::string& query_file,
-        const std::string& gt_file,
-        const std::string& metric,
-        const int split_number,
-        const std::string& output_path,
-        const int num_threads = 1) {
-    Log::redirect("hnsw_add" + std::to_string(split_number));
-    auto dataset = get_dataset(base_file, metric, query_file, gt_file);
-    int size = (int)dataset->getOracle()->size() / split_number;
-    int remainder = (int)dataset->getOracle()->size() % split_number;
-
-    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, 32, 200);
-    for (int i = 0; i < split_number; ++i) {
-        if (i == 1) {
-            omp_set_num_threads(num_threads);
-        }
-        if (i == split_number - 1) {
-            size += remainder;
-        }
-        hnsw->partial_build(size);
-    }
+    loadHGraph(hgraph, index_file, dataset->getOracle());
+    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, hgraph, true, max_neighbors, ef_construction);
+    omp_set_num_threads(num_threads);
+    hnsw->partial_build();
 
     recall(hnsw, dataset);
 
     std::string output_file = output_path + "/";
-    std::string dataset_name = dataset->getName();
-    output_file += dataset_name + "_" + std::to_string(split_number) + "_hnsw_add_from_scratch";
+    output_file += dataset->getName() + "_" + std::to_string(split_number) + "_baseline_hnsw_add";
     saveHGraph(hnsw->extractHGraph(), output_file);
 }
 
 void
-vamanaBuild(const std::string& base_file,
-            const std::string& query_file,
-            const std::string& gt_file,
-            const std::string& metric,
-            const std::string& output_path) {
-    Log::redirect("vamana_build");
-    auto dataset = get_dataset(base_file, metric, query_file, gt_file);
-
-    auto vamana = std::make_shared<diskann::Vamana>(dataset, 1.2, 200, 32);
-    omp_set_num_threads(1);
+vamana_build(DatasetPtr& dataset,
+             const std::string& output_path,
+             const int num_threads = 48,
+             const int ef_construction = 200,
+             const int max_neighbors = 32,
+             const float alpha = 1.2) {
+    auto vamana = std::make_shared<diskann::Vamana>(dataset, alpha, ef_construction, max_neighbors);
+    omp_set_num_threads(num_threads);
     vamana->build();
 
     recall(vamana, dataset);
@@ -141,227 +94,138 @@ vamanaBuild(const std::string& base_file,
 }
 
 void
-mergeSubindexesOurs(const std::string& base_file,
-                    const std::string& metric,
-                    const std::vector<std::string>& subindex_files,
-                    const std::string& query_file,
-                    const std::string& gt_file,
-                    const std::string& output_path,
-                    const int num_threads = 1) {
-    Log::redirect("merge_subindexes_ours");
-    auto dataset = get_dataset(base_file, metric, query_file, gt_file);
-    auto datasets = std::vector<DatasetPtr>();
-    dataset->split(datasets, subindex_files.size());
-    datasets.insert(datasets.begin(), dataset);
+mgraph_merge(DatasetPtr& dataset,
+             const std::string& output_path,
+             const std::vector<std::string>& subindex_files,
+             const int num_threads = 48,
+             const int index_type = 0,
+             const int k = 20,
+             const int ef_construction = 200) {
+    auto datasets = dataset->subsets(subindex_files.size());
 
     std::vector<IndexPtr> vec(subindex_files.size());
     for (size_t i = 0; i < subindex_files.size(); ++i) {
-        HGraph g;
-        loadHGraph(g, subindex_files[i]);
-        restore_distance(g, datasets[i]);
-        vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], g);
-    }
-    int max_degree = 16;
-    MGraph mgraph(max_degree, 200);
-    omp_set_num_threads(num_threads);
-    mgraph.Combine(vec);
-
-    recall(mgraph, dataset);
-
-    std::string output_file = output_path + "/";
-    std::string dataset_name = base_file.substr(base_file.find_last_of("/\\") + 1);
-    output_file += dataset_name + "_" + std::to_string(subindex_files.size()) + "_ours_" +
-                   std::to_string(max_degree);
-    saveHGraph(mgraph.extractHGraph(), output_file);
-}
-
-void
-mgraphMerge(const std::string& base_file,
-            const std::string& metric,
-            const int split,
-            const std::string& query_file,
-            const std::string& gt_file,
-            const std::string& output_path,
-            const int num_threads = 1,
-            const int index_type = 0) {
-    Log::redirect("mgraph" + std::to_string(split) + "_" + std::to_string(index_type));
-    auto dataset = get_dataset(base_file, metric, query_file, gt_file);
-    auto datasets = dataset->subsets(split);
-
-    std::vector<IndexPtr> vec(split);
-    for (int i = 0; i < split; ++i) {
         if (index_type == 0) {
-            logger << "Constructing HNSW index for " << i << " / " << split << " subindex."
-                   << std::endl;
-            vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], 32, 200);
+            HGraph hgraph;
+            loadHGraph(hgraph, subindex_files[i], datasets[i]->getOracle());
+            vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], hgraph);
         } else if (index_type == 1) {
-            logger << "Constructing Vamana index for " << i << " / " << split << " subindex."
-                   << std::endl;
-            vec[i] = std::make_shared<diskann::Vamana>(datasets[i], 1.2, 200, 32);
+            Graph graph;
+            loadGraph(graph, subindex_files[i], datasets[i]->getOracle());
+            vec[i] = std::make_shared<IndexWrapper>(datasets[i], graph);
         } else {
             throw std::invalid_argument("Unsupported index type");
         }
-        vec[i]->build();
     }
-    int max_degree = 20;
-    MGraph mgraph(dataset, max_degree, 200);
+    MGraph mgraph(dataset, k, ef_construction);
     omp_set_num_threads(num_threads);
     mgraph.Combine(vec);
 
     recall(mgraph, dataset);
 
     std::string output_file = output_path + "/";
-    std::string dataset_name = base_file.substr(base_file.find_last_of("/\\") + 1);
-    output_file += dataset_name + "_" + std::to_string(split) + "_ours" + "_" +
-                   std::to_string(max_degree) + "_index_type_" + std::to_string(index_type);
+    output_file += dataset->getName() + "_" + std::to_string(subindex_files.size()) + "_ours" +
+                   "_" + std::to_string(k) + "_index_type_" + std::to_string(index_type);
     saveHGraph(mgraph.extractHGraph(), output_file);
 }
 
-void
-loadAndTest(const std::string& base_file,
-            const std::string& metric,
-            const std::string& index_file,
-            const std::string& query_file,
-            const std::string& gt_file) {
-    Log::redirect("load_and_test");
-    logger << "Testing index: " << index_file << std::endl;
-    auto dataset = get_dataset(base_file, metric, query_file, gt_file);
-    HGraph hgraph;
-    loadHGraph(hgraph, index_file);
-    auto index = std::make_shared<hnsw::HNSW>(dataset, hgraph);
-    recall(index, dataset);
-}
-
 int
-main() {
-    Log::setVerbose(true);
-    for (const auto& v : {3, 4, 5, 6, 7}) {
-        mgraphMerge("/root/mount/dataset/internet_search/internet_search_train.fbin",
-                    "l2",
-                    v,
-                    "/root/mount/dataset/internet_search/internet_search_test.fbin",
-                    "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
-                    "/root/mount/my-anns/output/internet",
-                    48,
-                    1);
+main(int argc, char* argv[]) {
+    if (argc < 12) {
+        std::cerr << "Usage: " << argv[0]
+                  << " <base_file> <query_file> <gt_file> <metric> <output_path> "
+                     "<split_number> <num_threads> <k> <max_neighbors> <ef_construction> <alpha>"
+                  << std::endl;
+        return 1;
     }
+
+    std::string base_file = argv[1];
+    std::string query_file = argv[2];
+    std::string gt_file = argv[3];
+    std::string metric = argv[4];
+    std::string output_path = argv[5];
+
+    int split_number = std::stoi(argv[6]);
+    int num_threads = std::stoi(argv[7]);
+
+    int k = std::stoi(argv[8]);
+    int max_neighbors = std::stoi(argv[9]);
+    int ef_construction = std::stoi(argv[10]);
+    float alpha = std::stof(argv[11]);
+
+    Log::setVerbose(true);
+    Log::redirect(output_path);
+
+    auto dataset = get_dataset(base_file, metric, query_file, gt_file);
+
+    std::cout << "Step 1, build HNSW sub-indexes." << std::endl;
+    auto hnsw_indexes =
+        build_sub_indexes(dataset, output_path, split_number, 0, max_neighbors, ef_construction);
+    std::cout << "------------------------------------" << std::endl;
+
+    std::cout << "Step 2, use HNSW to insert smaller datasets into larger index." << std::endl;
+    hnsw_add(dataset,
+             hnsw_indexes[0],
+             split_number,
+             output_path,
+             num_threads,
+             max_neighbors,
+             ef_construction);
+    std::cout << "------------------------------------" << std::endl;
+
+    std::cout << "Step 3, merge sub-indexes using our method." << std::endl;
+    mgraph_merge(dataset, output_path, hnsw_indexes, num_threads, 0, k, ef_construction);
+    std::cout << "------------------------------------" << std::endl;
+
+    std::cout << "Step 4, build Vamana sub-indexes." << std::endl;
+    auto vamana_indexes = build_sub_indexes(
+        dataset, output_path, split_number, 1, max_neighbors, ef_construction, alpha);
+    std::cout << "------------------------------------" << std::endl;
+
+    std::cout << "Step 5, merge sub-indexes using our method." << std::endl;
+    mgraph_merge(dataset, output_path, vamana_indexes, num_threads, 1, k, ef_construction);
+
+    if (split_number == 2) {
+        std::cout << "Step 6, reconstruct Vamana index on the full dataset." << std::endl;
+        vamana_build(dataset, output_path, num_threads, ef_construction, max_neighbors, alpha);
+    }
+
+    std::cout << "Finished!" << std::endl;
+
     return 0;
 }
 
 // int
-// main() {
+// main1() {
 //     Log::setVerbose(true);
 //
-//     mergeSubindexes("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
-//                     "l2",
-//                     {"/root/mount/my-anns/output/siftsmall/index_part_siftsmall_base.fvecs_0.bin",
-//                      "/root/mount/my-anns/output/siftsmall/index_part_siftsmall_base.fvecs_1.bin"},
-//                     "/root/mount/my-anns/output/siftsmall");
+//     hnsw_add("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
+//              "/root/mount/dataset/siftsmall/siftsmall_query.fvecs",
+//              "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs",
+//              "l2",
+//              "/root/mount/my-anns/output/siftsmall/index_part_siftsmall_base.fvecs_0.bin",
+//              2,
+//              "/root/mount/my-anns/output/siftsmall",
+//              48);
 //
-//     mergeSubindexesOurs(
-//         "/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
-//         "l2",
-//         {"/root/mount/my-anns/output/siftsmall/index_part_siftsmall_base.fvecs_0.bin",
-//          "/root/mount/my-anns/output/siftsmall/index_part_siftsmall_base.fvecs_1.bin"},
-//         "/root/mount/dataset/siftsmall/siftsmall_query.fvecs",
-//         "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs",
-//         "/root/mount/my-anns/output/siftsmall");
+//     // mgraphMerge("/root/mount/dataset/internet_search/internet_search_train.fbin",
+//     //                 "l2",
+//     //                 2,
+//     //                 "/root/mount/dataset/internet_search/internet_search_test.fbin",
+//     //                 "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
+//     //                 "/root/mount/my-anns/output/internet",
+//     //                 48,
+//     //                 0);
 //
-//     mergeSubindexes(
-//         "/root/mount/dataset/internet_search/internet_search_train.fbin",
-//         "l2",
-//         {"/root/mount/my-anns/output/internet/index_part_internet_search_train.fbin_0.bin",
-//          "/root/mount/my-anns/output/internet/index_part_internet_search_train.fbin_1.bin"},
-//         "/root/mount/my-anns/output/internet");
-//
-//     mergeSubindexesOurs(
-//         "/root/mount/dataset/internet_search/internet_search_train.fbin",
-//         "l2",
-//         {"/root/mount/my-anns/output/internet/index_part_internet_search_train.fbin_0.bin",
-//          "/root/mount/my-anns/output/internet/index_part_internet_search_train.fbin_1.bin"},
-//         "/root/mount/dataset/internet_search/internet_search_test.fbin",
-//         "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
-//         "/root/mount/my-anns/output/internet");
-//
-//     loadAndTest("/root/mount/dataset/internet_search/internet_search_train.fbin",
-//                 "l2",
-//                 "/root/mount/my-anns/output/internet/internet_search_train.fbin_2_hnsw_add_1.bin",
-//                 "/root/mount/dataset/internet_search/internet_search_test.fbin",
-//                 "/root/mount/dataset/internet_search/internet_search_neighbors.fbin");
-//
-//     loadAndTest("/root/mount/dataset/internet_search/internet_search_train.fbin",
-//                 "l2",
-//                 "/root/mount/my-anns/output/internet/internet_search_train.fbin_2_ours_16.bin",
-//                 "/root/mount/dataset/internet_search/internet_search_test.fbin",
-//                 "/root/mount/dataset/internet_search/internet_search_neighbors.fbin");
-//
-//     hnswAdd("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
-//             "/root/mount/dataset/siftsmall/siftsmall_query.fvecs",
-//             "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs",
-//             "l2",
-//             2,
-//             "/root/mount/my-anns/output/siftsmall");
-//
-//     vamanaBuild("/root/mount/dataset/internet_search/internet_search_train.fbin",
-//                 "/root/mount/dataset/internet_search/internet_search_test.fbin",
-//                 "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
-//                 "l2",
-//                 "/root/mount/my-anns/output/internet");
-//
-//     for (const auto& v : {3, 4, 5, 6, 7}) {
-//         hnswAdd("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
-//                 "/root/mount/dataset/siftsmall/siftsmall_query.fvecs",
-//                 "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs",
-//                 "l2",
-//                 v,
-//                 "/root/mount/my-anns/output/siftsmall",
-//                 48);
-//
-//         mgraphMerge("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
-//                     "l2",
-//                     v,
-//                     "/root/mount/dataset/siftsmall/siftsmall_query.fvecs",
-//                     "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs",
-//                     "/root/mount/my-anns/output/siftsmall",
-//                     48);
-//
-//         hnswAdd("/root/mount/dataset/internet_search/internet_search_train.fbin",
-//                 "/root/mount/dataset/internet_search/internet_search_test.fbin",
-//                 "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
-//                 "l2",
-//                 v,
-//                 "/root/mount/my-anns/output/internet",
-//                 48);
-//
-//         mgraphMerge("/root/mount/dataset/internet_search/internet_search_train.fbin",
-//                     "l2",
-//                     v,
-//                     "/root/mount/dataset/internet_search/internet_search_test.fbin",
-//                     "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
-//                     "/root/mount/my-anns/output/internet",
-//                     48);
-//     }
-//
-//     return 0;
-// }
-
-// int
-// main(int argc, char *argv[]) {
-//     Log::setVerbose(true);
-//     if (argc < 4) {
-//         std::cerr << "Usage: " << argv[0] << " <base_file> <metric> <output_path> <split_number>" << std::endl;
-//         return 1;
-//     }
-//
-//     std::string base_file = argv[1];
-//     std::string metric = argv[2];
-//     std::string output_path = argv[3];
-//     int split_number = 2;
-//     if (argc > 4) {
-//         split_number = std::stoi(argv[4]);
-//     }
-//
-//     buildSubIndexes(base_file, metric, output_path, split_number);
-//
+//     // for (const auto& v : {3, 4, 5, 6, 7}) {
+//     //     mgraphMerge("/root/mount/dataset/internet_search/internet_search_train.fbin",
+//     //                 "l2",
+//     //                 v,
+//     //                 "/root/mount/dataset/internet_search/internet_search_test.fbin",
+//     //                 "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
+//     //                 "/root/mount/my-anns/output/internet",
+//     //                 48,
+//     //                 1);
+//     // }
 //     return 0;
 // }

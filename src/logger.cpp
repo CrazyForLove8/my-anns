@@ -46,16 +46,21 @@ Log::redirect(const std::string& filename) {
     std::string timestamp = getTimestamp();
 
     if (p.is_absolute()) {
-        if (p.has_filename()) {
+        if (std::filesystem::is_directory(p)) {
+            if (!std::filesystem::exists(p)) {
+                std::filesystem::create_directories(p);
+            }
+            finalPath = p / (timestamp + ".log");
+        } else if (p.has_filename()) {
             finalPath = p;
-            if (!finalPath.has_extension()) {
-                finalPath += ".log";
+            if (finalPath.has_parent_path() && !std::filesystem::exists(finalPath.parent_path())) {
+                std::filesystem::create_directories(finalPath.parent_path());
             }
         } else {
+            if (!std::filesystem::exists(p)) {
+                std::filesystem::create_directories(p);
+            }
             finalPath = p / (timestamp + ".log");
-        }
-        if (finalPath.has_parent_path() && !std::filesystem::exists(finalPath.parent_path())) {
-            std::filesystem::create_directories(finalPath.parent_path());
         }
     } else {
         std::filesystem::path relativeBaseDir = dir;
