@@ -14,7 +14,8 @@ CsvLogger::~CsvLogger() {
     }
 }
 
-bool CsvLogger::writeHeader(const std::vector<std::string>& headers) {
+bool
+CsvLogger::writeHeader(const std::vector<std::string>& headers) {
     if (!ofs_.is_open()) {
         std::cerr << "Error: CsvLogger - Cannot write header, file not open." << std::endl;
         return false;
@@ -35,16 +36,17 @@ bool CsvLogger::writeHeader(const std::vector<std::string>& headers) {
     return true;
 }
 
-bool CsvLogger::isOpen() const {
+bool
+CsvLogger::isOpen() const {
     return ofs_.is_open();
 }
 
-std::string CsvLogger::toCsvString(const std::string& value) {
+std::string
+CsvLogger::toCsvString(const std::string& value) {
     std::string escaped_value = value;
     if (escaped_value.find(',') != std::string::npos ||
         escaped_value.find('\n') != std::string::npos ||
         escaped_value.find('"') != std::string::npos) {
-
         size_t pos = escaped_value.find('"');
         while (pos != std::string::npos) {
             escaped_value.replace(pos, 1, "\"\"");

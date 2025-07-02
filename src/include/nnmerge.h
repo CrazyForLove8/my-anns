@@ -52,6 +52,9 @@ public:
 
     void
     Combine(const IndexPtr& index1, const IndexPtr& index2);
+
+    void
+    print_info() const override;
 };
 }  // namespace nnmerge
 #endif  //MYANNS_NNMERGE_H

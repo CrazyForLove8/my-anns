@@ -59,6 +59,9 @@ public:
 
     void
     partial_build(std::vector<uint32_t>& permutation);
+
+    void
+    print_info() const override;
 };
 
 class DiskANN : public Index {

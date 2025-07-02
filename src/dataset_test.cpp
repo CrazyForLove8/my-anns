@@ -36,7 +36,7 @@ testMerge() {
 
     std::cout << "The original dataset has " << dataset->getBase().size() << " points" << std::endl;
 
-    for (int x = 1; x <= datasets.size(); ++x) {
+    for (size_t x = 1; x <= datasets.size(); ++x) {
         std::cout << "The " << x << " dataset has " << datasets[x - 1]->getBase().size()
                   << " points" << std::endl;
     }
@@ -47,7 +47,7 @@ testMerge() {
               << std::endl;
     std::cout << "Oracle size: " << dataset->getOracle()->size() << std::endl;
 
-    for (int x = 1; x <= datasets.size(); ++x) {
+    for (size_t x = 1; x <= datasets.size(); ++x) {
         std::cout << "The " << x << " dataset has " << datasets[x - 1]->getBase().size()
                   << " points" << std::endl;
         std::cout << "Oracle size: " << datasets[x - 1]->getOracle()->size() << std::endl;
@@ -62,7 +62,7 @@ testAggregate() {
 
     std::cout << "The original dataset has " << dataset->getBase().size() << " points" << std::endl;
 
-    for (int x = 1; x <= datasets.size(); ++x) {
+    for (size_t x = 1; x <= datasets.size(); ++x) {
         std::cout << "The " << x << " dataset has " << datasets[x - 1]->getBase().size()
                   << " points" << std::endl;
     }
@@ -74,14 +74,40 @@ testAggregate() {
               << std::endl;
     std::cout << "Oracle size: " << res->getOracle()->size() << std::endl;
 
-    for (int x = 1; x <= datasets.size(); ++x) {
+    for (size_t x = 1; x <= datasets.size(); ++x) {
         std::cout << "The " << x << " dataset has " << datasets[x - 1]->getBase().size()
                   << " points" << std::endl;
         std::cout << "Oracle size: " << datasets[x - 1]->getOracle()->size() << std::endl;
     }
 }
 
+void
+testSubset() {
+    auto dataset =
+        Dataset::getInstance("/root/mount/dataset/siftsmall/siftsmall_base.fvecs", DISTANCE::L2);
+    std::cout << "The original dataset has " << dataset->getBase().size() << " points" << std::endl;
+
+    for (auto& v : {2, 3, 4, 5, 6, 7}) {
+        auto datasets = dataset->subsets(v);
+        for (size_t x = 1; x <= datasets.size(); ++x) {
+            std::cout << "The " << x << " / " << v << " dataset has "
+                      << datasets[x - 1]->getBase().size() << " points" << std::endl;
+            std::cout << "Oracle size: " << datasets[x - 1]->getOracle()->size() << std::endl;
+            auto last = datasets[x - 1]->getBase().size() - 1;
+            auto dist = (*datasets[x - 1]->getOracle())(0, last);
+            std::cout << "Distance between first and last point in dataset " << x << "/" << v
+                      << " is: " << dist << std::endl;
+        }
+
+        std::cout << "The original dataset has " << dataset->getBase().size() << " points"
+                  << std::endl;
+        std::cout << "Oracle size: " << dataset->getOracle()->size() << std::endl;
+    }
+}
+
 int
 main() {
+    Log::setVerbose(true);
 
+    testSubset();
 }

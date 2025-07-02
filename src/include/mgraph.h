@@ -9,7 +9,7 @@
 
 using namespace graph;
 
-// MGraph refers to Merged hierarchical Graph index
+// MGraph refers to Merged hierarchical Graph-based anns index
 class MGraph : public FGIM {
 private:
     HGraph graph_;
@@ -65,6 +65,9 @@ public:
 
     Neighbors
     search(const float* query, unsigned int topk, unsigned int L) const override;
+
+    void
+    print_info() const override;
 };
 
 #endif  //MYANNS_MGRAPH_H

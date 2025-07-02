@@ -7,6 +7,7 @@ nnmerge::NNMerge::NNMerge(
 
 void
 nnmerge::NNMerge::Combine(const IndexPtr& index1, const IndexPtr& index2) {
+    print_info();
     auto& graph1 = index1->extractGraph();
     auto& graph2 = index2->extractGraph();
 
@@ -28,6 +29,12 @@ nnmerge::NNMerge::Combine(const IndexPtr& index1, const IndexPtr& index2) {
 
     flatten_graph_ = FlattenGraph(graph_);
     built_ = true;
+}
+
+void
+nnmerge::NNMerge::print_info() const {
+    NNDescent::print_info();
+    logger << "NNMerge with alpha: " << alpha << std::endl;
 }
 
 void

@@ -42,6 +42,9 @@ public:
     NNDescent(DatasetPtr& dataset, int K, float rho = 0.5, float delta = 0.001, int iteration = 20);
 
     ~NNDescent() override = default;
+
+    void
+    print_info() const override;
 };
 }  // namespace nndescent
 

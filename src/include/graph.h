@@ -130,8 +130,7 @@ struct FlattenGraph {
 
     explicit FlattenGraph(const Graph& graph);
 
-    virtual std::vector<int>
-    operator[](int i) const;
+    virtual std::vector<int> operator[](int i) const;
 
     virtual ~FlattenGraph() = default;
 };
@@ -143,8 +142,7 @@ struct FlattenHGraph {
 
     explicit FlattenHGraph(const HGraph& graph);
 
-    FlattenGraph&
-    operator[](int i) const;
+    FlattenGraph& operator[](int i) const;
 
     [[nodiscard]] int
     size() const;

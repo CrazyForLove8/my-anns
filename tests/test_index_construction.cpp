@@ -7,7 +7,7 @@
 void
 test_nndescent(OraclePtr& oracle,
                const Matrix<float>& query,
-               const std::vector<std::vector<unsigned int>>& groundTruth,
+               const std::vector<std::vector<unsigned int> >& groundTruth,
                unsigned int K) {
     nndescent::NNDescent nndescent(oracle, 20);
 
@@ -21,7 +21,7 @@ test_nndescent(OraclePtr& oracle,
 void
 test_vamana(OraclePtr& oracle,
             const Matrix<float>& query,
-            const std::vector<std::vector<unsigned int>>& groundTruth,
+            const std::vector<std::vector<unsigned int> >& groundTruth,
             unsigned int K) {
     diskann::Vamana vamana(oracle, 1.2, 100, 80);
 
@@ -35,7 +35,7 @@ test_vamana(OraclePtr& oracle,
 void
 test_taumng(OraclePtr& oracle,
             const Matrix<float>& query,
-            const std::vector<std::vector<unsigned int>>& groundTruth,
+            const std::vector<std::vector<unsigned int> >& groundTruth,
             unsigned int K) {
     nndescent::NNDescent nndescent(oracle, 20);
 
@@ -55,7 +55,7 @@ test_taumng(OraclePtr& oracle,
 void
 test_nsw(OraclePtr& oracle,
          const Matrix<float>& query,
-         const std::vector<std::vector<unsigned int>>& groundTruth,
+         const std::vector<std::vector<unsigned int> >& groundTruth,
          unsigned int K) {
     nsw::NSW nsw(oracle, 32, 100);
 

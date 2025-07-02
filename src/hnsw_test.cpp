@@ -140,8 +140,8 @@ hnsw_exp_extend_observation() {
     dataset->split(datasets, idx_size);
     datasets.insert(datasets.begin(), dataset);
 
-    std::vector<std::shared_ptr<HNSW>> indexes;
-    std::vector<std::reference_wrapper<Graph>> graphs;
+    std::vector<std::shared_ptr<HNSW> > indexes;
+    std::vector<std::reference_wrapper<Graph> > graphs;
     std::vector<int> offsets;
     offsets.emplace_back(0);
     for (size_t i = 0; i < idx_size; i++) {
@@ -200,10 +200,11 @@ hnsw_exp_extend_observation() {
 void
 test_save_and_load() {
     Log::redirect("hnsw_build_internet_search");
-    DatasetPtr dataset = Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
-        "/root/mount/dataset/internet_search/internet_search_test.fbin",
-        "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
-                                              DISTANCE::L2);
+    DatasetPtr dataset =
+        Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
+                             "/root/mount/dataset/internet_search/internet_search_test.fbin",
+                             "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
+                             DISTANCE::L2);
     auto index = std::make_shared<HNSW>(dataset, 32, 200);
     index->build();
 
@@ -230,9 +231,9 @@ test_partial_build() {
                                               DISTANCE::L2);
     auto index = std::make_shared<HNSW>(dataset, 32, 200);
     int split = 3;
-    int size =  dataset->getOracle()->size() / split;
+    int size = dataset->getOracle()->size() / split;
     int remainder = dataset->getOracle()->size() % split;
-    for (int i = 0 ; i < split; ++i) {
+    for (int i = 0; i < split; ++i) {
         if (i == split - 1) {
             size += remainder;
         }

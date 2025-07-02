@@ -47,7 +47,7 @@ subgraph_nsw(IndexOracle<float>& oracle_half1, IndexOracle<float>& oracle_half2)
 void
 test_fgim(Matrix<float>& base,
           const Matrix<float>& query,
-          const std::vector<std::vector<unsigned int>>& groundTruth,
+          const std::vector<std::vector<unsigned int> >& groundTruth,
           unsigned int K,
           unsigned int M0 = 20,
           unsigned int L = 20,

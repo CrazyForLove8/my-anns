@@ -149,8 +149,7 @@ FlattenGraph::FlattenGraph(const Graph& graph) {
     }
 }
 
-std::vector<int>
-FlattenGraph::operator[](int i) const {
+std::vector<int> FlattenGraph::operator[](int i) const {
     return {final_graph.begin() + offsets[i], final_graph.begin() + offsets[i + 1]};
 }
 
@@ -166,8 +165,7 @@ FlattenHGraph::FlattenHGraph(const HGraph& graph) {
     }
 }
 
-FlattenGraph&
-FlattenHGraph::operator[](int i) const {
+FlattenGraph& FlattenHGraph::operator[](int i) const {
     return const_cast<FlattenGraph&>(graphs_[i]);
 }
 
@@ -462,7 +460,8 @@ graph::track_search(IndexOracle<float>* oracle,
 }
 
 std::string graph_output_dir = "/root/code/algotests/myanns/outputs/";
-std::string get_path(std::string filename) {
+std::string
+get_path(std::string filename) {
     if (filename.find(".bin") == std::string::npos) {
         filename += ".bin";
     }
@@ -531,7 +530,8 @@ graph::loadGraph(Graph& graph, const std::string& filename) {
 
         graph[node_id].candidates_.resize(num_neighbors);
         for (size_t j = 0; j < num_neighbors; ++j) {
-            file.read(reinterpret_cast<char*>(&graph[node_id].candidates_[j].id), sizeof(graph[node_id].candidates_[j].id));
+            file.read(reinterpret_cast<char*>(&graph[node_id].candidates_[j].id),
+                      sizeof(graph[node_id].candidates_[j].id));
         }
     }
     file.close();
@@ -558,7 +558,7 @@ graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
     checkFile.close();
 
     std::vector<int> levels(hgraph[0].size(), 0);
-    for (int i = hgraph.size() - 1 ; i >= 0; --i) {
+    for (int i = hgraph.size() - 1; i >= 0; --i) {
         for (int j = 0; j < hgraph[i].size(); ++j) {
             if (hgraph[i][j].candidates_.empty()) {
                 continue;
@@ -573,11 +573,11 @@ graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
     logger << "Graph size: " << graph_size << ", Max level: " << max_level << std::endl;
     file.write(reinterpret_cast<const char*>(&graph_size), sizeof(graph_size));
     file.write(reinterpret_cast<const char*>(&max_level), sizeof(max_level));
-    for (int64_t i = 0 ; i < graph_size; ++i) {
+    for (int64_t i = 0; i < graph_size; ++i) {
         file.write(reinterpret_cast<const char*>(&i), sizeof(i));
         int level = levels[i];
         file.write(reinterpret_cast<const char*>(&level), sizeof(level));
-        for (int j = 0 ; j <= level; ++j) {
+        for (int j = 0; j <= level; ++j) {
             int64_t num_candidates = hgraph[j][i].candidates_.size();
             file.write(reinterpret_cast<const char*>(&num_candidates), sizeof(num_candidates));
             for (const auto& neighbor : hgraph[j][i].candidates_) {
@@ -618,7 +618,8 @@ graph::loadHGraph(HGraph& hgraph, const std::string& filename) {
             file.read(reinterpret_cast<char*>(&num_neighbors), sizeof(num_neighbors));
             hgraph[j][node_id].candidates_.resize(num_neighbors);
             for (int k = 0; k < num_neighbors; ++k) {
-                file.read(reinterpret_cast<char*>(&hgraph[j][node_id].candidates_[k].id), sizeof(hgraph[j][node_id].candidates_[k].id));
+                file.read(reinterpret_cast<char*>(&hgraph[j][node_id].candidates_[k].id),
+                          sizeof(hgraph[j][node_id].candidates_[k].id));
             }
         }
     }

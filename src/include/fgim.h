@@ -21,13 +21,6 @@ protected:
 
     float sample_rate_;
 
-    //        void
-    //        Sampling(Graph &graph,
-    //                 const Graph &g1,
-    //                 const Graph &g2,
-    //                 OraclePtr &oracle1,
-    //                 OraclePtr &oracle2,
-    //                 OraclePtr &oracle);
     virtual void
     CrossQuery(std::vector<IndexPtr>& indexes);
 
@@ -61,24 +54,11 @@ public:
 
     ~FGIM() override = default;
 
-    //        /**
-    //               * @brief FGIM two PGs
-    //               * @param g1  The first graph
-    //               * @param oracle1 The distance oracle of the first graph
-    //               * @param g2  The second nearest neighbor graph
-    //               * @param oracle2 The distance oracle of the second graph
-    //               * @param oracle The distance oracle
-    //               * @return The merged graph
-    //               */
-    //        Graph
-    //        merge(const Graph &g1,
-    //              OraclePtr &oracle1,
-    //              const Graph &g2,
-    //              OraclePtr &oracle2,
-    //              OraclePtr &oracle);
-
     virtual void
     Combine(std::vector<IndexPtr>& indexes);
+
+    void
+    print_info() const override;
 };
 
 #endif  // MYANNS_MERGE_H

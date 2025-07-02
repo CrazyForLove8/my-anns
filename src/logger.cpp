@@ -35,7 +35,8 @@ Log::getTimestamp() {
     return oss.str();
 }
 
-void Log::redirect(const std::string& filename) {
+void
+Log::redirect(const std::string& filename) {
     if (logFile.is_open()) {
         logFile.close();
     }

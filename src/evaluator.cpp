@@ -103,7 +103,7 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
         if (std::holds_alternative<IndexPtr>(index)) {
             calRecall(std::get<IndexPtr>(index), dataset, qsize, L, K, runs);
         } else {
-            calRecall(std::get<std::reference_wrapper<Index>>(index), dataset, qsize, L, K, runs);
+            calRecall(std::get<std::reference_wrapper<Index> >(index), dataset, qsize, L, K, runs);
         }
     }
 }

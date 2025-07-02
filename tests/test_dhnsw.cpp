@@ -86,7 +86,7 @@ main() {
         }
         current_cluster_id++;
     }
-    std::unordered_map<int, std::vector<int>> cluster_map;
+    std::unordered_map<int, std::vector<int> > cluster_map;
 
     for (const auto& entry : duplicate_map) {
         int point_id = entry.first;

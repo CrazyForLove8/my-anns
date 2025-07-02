@@ -79,6 +79,9 @@ public:
      */
     virtual Neighbors
     search(const float* query, unsigned int topk, unsigned int L) const;
+
+    virtual void
+    print_info() const;
 };
 
 using IndexPtr = std::shared_ptr<Index>;

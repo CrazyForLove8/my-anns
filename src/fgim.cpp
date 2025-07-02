@@ -90,6 +90,7 @@ void
 FGIM::update_neighbors(Graph& graph) {
     size_t it = 0;
     unsigned samples = sample_rate_ * max_base_degree_;
+    // TODO Memory overhead is too high, 'new' 'old', 'reverse_new', 'reverse_old' can be removed
 #pragma omp parallel for
     for (auto& u : graph) {
         for (int v = (int)(u.candidates_.size() / 2); v < u.candidates_.size(); ++v) {
@@ -99,11 +100,10 @@ FGIM::update_neighbors(Graph& graph) {
     }
     while (++it && it <= ITER_MAX) {
         int cnt = 0;
-        long long dist_calc = 0;
 #pragma omp parallel
         {
             std::mt19937 rng(2024 + omp_get_thread_num());
-#pragma omp for reduction(+ : cnt, dist_calc) schedule(dynamic, 256)
+#pragma omp for reduction(+ : cnt) schedule(dynamic, 256)
             for (int vv = 0; vv < graph.size(); ++vv) {
                 auto& v = graph[vv];
                 auto& _old = v.old_;
@@ -140,7 +140,6 @@ FGIM::update_neighbors(Graph& graph) {
                             continue;
                         }
                         auto dist = (*oracle_)(_new[i], _new[j]);
-                        ++dist_calc;
                         if (dist < graph[_new[i]].candidates_.front().distance ||
                             dist < graph[_new[j]].candidates_.front().distance) {
                             cnt += graph[_new[i]].pushHeap(_new[j], dist);
@@ -152,7 +151,6 @@ FGIM::update_neighbors(Graph& graph) {
                             continue;
                         }
                         auto dist = (*oracle_)(_new[i], _old[j]);
-                        ++dist_calc;
                         if (dist < graph[_new[i]].candidates_.front().distance ||
                             dist < graph[_old[j]].candidates_.front().distance) {
                             cnt += graph[_new[i]].pushHeap(_old[j], dist);
@@ -184,16 +182,6 @@ FGIM::update_neighbors(Graph& graph) {
         }
 
         logger << "Iteration " << it << " with " << cnt << " new edges" << std::endl;
-        //        logger << "Dist calc: " << dist_calc << std::endl;
-        //        double sum_dist = 0;
-        //        for (auto &u: graph) {
-        //            for (auto &v: u.candidates_) {
-        //                sum_dist += v.distance;
-        //            }
-        //        }
-        //        logger << "Sum distance: " << sum_dist << std::endl;
-        //        logger << "Average distance: " << sum_dist / (graph.size() * max_base_degree_) << std::endl;
-
         unsigned convergence = std::lround(THRESHOLD * static_cast<float>(graph.size()) *
                                            static_cast<float>(max_base_degree_));
         //        connect_no_indegree(graph);
@@ -480,8 +468,8 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
     Timer timer;
     timer.start();
 
-    std::vector<std::reference_wrapper<Graph>> graphs;
-    std::vector<std::reference_wrapper<HGraph>> hgraphs;
+    std::vector<std::reference_wrapper<Graph> > graphs;
+    std::vector<std::reference_wrapper<HGraph> > hgraphs;
     bool isHGraph = true;
     for (auto& index : indexes) {
         auto hnsw_index = std::dynamic_pointer_cast<hnsw::HNSW>(index);
@@ -592,6 +580,7 @@ FGIM::Combine(std::vector<IndexPtr>& indexes) {
         base_ = dataset_->getBasePtr();
         Graph(oracle_->size()).swap(graph_);
     }
+    print_info();
 
     for (auto& u : graph_) {
         u.candidates_.reserve(max_base_degree_);
@@ -611,4 +600,12 @@ FGIM::Combine(std::vector<IndexPtr>& indexes) {
 
     flatten_graph_ = FlattenGraph(graph_);
     built_ = true;
+}
+
+void
+FGIM::print_info() const {
+    Index::print_info();
+    logger << "Max degree: " << max_degree_ << std::endl;
+    logger << "Max base degree: " << max_base_degree_ << std::endl;
+    logger << "Sample rate: " << sample_rate_ << std::endl;
 }

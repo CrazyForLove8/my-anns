@@ -112,9 +112,6 @@ nsw::NSW::add(DatasetPtr& dataset) {
     }
     built_ = false;
 
-    Timer timer;
-    timer.start();
-
     auto cur_size = oracle_->size();
     auto total = dataset->getOracle()->size() + cur_size;
     graph_.reserve(total);
@@ -123,7 +120,10 @@ nsw::NSW::add(DatasetPtr& dataset) {
         std::vector<DatasetPtr> datasets = {dataset};
         dataset_->merge(datasets);
     }
+    print_info();
 
+    Timer timer;
+    timer.start();
 #pragma omp parallel for schedule(dynamic)
     for (int i = cur_size; i < total; ++i) {
         if (i % 10000 == 0) {
@@ -137,4 +137,11 @@ nsw::NSW::add(DatasetPtr& dataset) {
 
     flatten_graph_ = FlattenGraph(graph_);
     built_ = true;
+}
+void
+nsw::NSW::print_info() const {
+    Index::print_info();
+    logger << "NSW Index Info:" << std::endl;
+    logger << "Max neighbors: " << max_neighbors_ << std::endl;
+    logger << "EF Construction: " << ef_construction_ << std::endl;
 }

@@ -50,14 +50,14 @@ protected:
         const Graph& graph, const float* query, size_t topk, size_t L, size_t entry_id) const;
 
     /**
-                               * This implementation follows the original paper.
-                               * @param graph
-                               * @param oracle
-                               * @param query
-                               * @param enter_point
-                               * @param ef
-                               * @return
-                               */
+   * This implementation follows the original paper.
+   * @param graph
+   * @param oracle
+   * @param query
+   * @param enter_point
+   * @param ef
+   * @return
+   */
     Neighbors
     searchLayer(Graph& graph, IndexOracle<float>& oracle, float* query, int enter_point, int ef);
 
@@ -106,12 +106,8 @@ public:
     Neighbors
     search(const float* query, unsigned int topk, unsigned int L) const override;
 
-    //        virtual Neighbors
-    //        HNSW_search(HGraph &hnsw_graph,
-    //                    IndexOracle<float> &oracle,
-    //                    float *query,
-    //                    int topk,
-    //                    int ef_search) const;
+    void
+    print_info() const override;
 };
 }  // namespace hnsw
 

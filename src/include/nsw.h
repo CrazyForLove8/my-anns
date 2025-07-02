@@ -45,6 +45,9 @@ public:
     set_ef_construction(int ef_construction) {
         this->ef_construction_ = ef_construction;
     }
+
+    void
+    print_info() const override;
 };
 }  // namespace nsw
 

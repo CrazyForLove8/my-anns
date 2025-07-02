@@ -1,6 +1,7 @@
 #include "annslib.h"
 
-int main() {
+int
+main() {
     CsvLogger logger("my_experiment_results.csv", 4);
 
     if (!logger.isOpen()) {
@@ -8,7 +9,8 @@ int main() {
         return 1;
     }
 
-    std::vector<std::string> headers = {"TrialID", "Parameter_X", "Parameter_Y", "Result_Value", "Status", "Notes"};
+    std::vector<std::string> headers = {
+        "TrialID", "Parameter_X", "Parameter_Y", "Result_Value", "Status", "Notes"};
     if (!logger.writeHeader(headers)) {
         return 1;
     }
@@ -33,17 +35,15 @@ int main() {
             notes = "Normal run";
         }
 
-        logger.writeRow(std::vector<std::string>{
-            std::to_string(trial_id), // int 转换为 string
-            std::to_string(param_x),  // double 转换为 string
-            std::to_string(param_y),
-            std::to_string(result),
-            status,
-            notes
-        });
+        logger.writeRow(std::vector<std::string>{std::to_string(trial_id),  // int 转换为 string
+                                                 std::to_string(param_x),  // double 转换为 string
+                                                 std::to_string(param_y),
+                                                 std::to_string(result),
+                                                 status,
+                                                 notes});
 
         logger.writeRow(std::vector<double>{
-            (double)trial_id, // 整数转换为double
+            (double)trial_id,  // 整数转换为double
             param_x,
             param_y,
             result,

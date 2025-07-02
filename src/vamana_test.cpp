@@ -213,8 +213,8 @@ vamana_exp_extend_observation() {
     dataset->split(datasets, idx_size);
     datasets.insert(datasets.begin(), dataset);
 
-    std::vector<std::shared_ptr<diskann::Vamana>> indexes;
-    std::vector<std::reference_wrapper<Graph>> graphs;
+    std::vector<std::shared_ptr<diskann::Vamana> > indexes;
+    std::vector<std::reference_wrapper<Graph> > graphs;
     std::vector<int> offsets;
     offsets.emplace_back(0);
     for (size_t i = 0; i < idx_size; i++) {

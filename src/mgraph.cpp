@@ -49,8 +49,8 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     Timer timer;
     timer.start();
 
-    std::vector<std::reference_wrapper<Graph>> graphs;
-    std::vector<std::reference_wrapper<HGraph>> hgraphs;
+    std::vector<std::reference_wrapper<Graph> > graphs;
+    std::vector<std::reference_wrapper<HGraph> > hgraphs;
     bool isHGraph = true;
     for (auto& index : indexes) {
         auto hnsw_index = std::dynamic_pointer_cast<hnsw::HNSW>(index);
@@ -116,7 +116,7 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     //    }
 
     logger << "Performing Cross Query" << std::endl;
-    unsigned L = max_base_degree_ / (indexes.size() - 1);
+    unsigned L = max_degree_ / (indexes.size() - 1);
     logger << "ef_construction: " << L << std::endl;
 #pragma omp parallel for schedule(dynamic)
     for (int u = 0; u < oracle_->size(); ++u) {
@@ -266,6 +266,7 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
         visited_list_pool_ = dataset_->getVisitedListPool();
         base_ = dataset_->getBasePtr();
     }
+    print_info();
 
     int total = oracle_->size();
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
@@ -320,4 +321,10 @@ MGraph::search(const float* query, unsigned int topk, unsigned int L) const {
     auto res = graph::search(
         oracle_.get(), visited_list_pool_.get(), flatten_graph_[0], query, topk, L, cur_node_);
     return res;
+}
+void
+MGraph::print_info() const {
+    FGIM::print_info();
+    logger << "MGraph Info:" << std::endl;
+    logger << "Ef Construction: " << ef_construction_ << std::endl;
 }

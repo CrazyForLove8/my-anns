@@ -51,6 +51,9 @@ public:
 
     void
     set_h(int h);
+
+    void
+    print_info() const override;
 };
 }  // namespace taumng
 

@@ -14,6 +14,15 @@ taumng::TauMNG::set_h(int h) {
     this->h_ = h;
 }
 
+void
+taumng::TauMNG::print_info() const {
+    Index::print_info();
+    logger << "TauMNG parameters:" << std::endl;
+    logger << "  t: " << t_ << std::endl;
+    logger << "  h: " << h_ << std::endl;
+    logger << "  b: " << b_ << std::endl;
+}
+
 //void
 //taumng::TauMNG::build() {
 //    Timer timer;

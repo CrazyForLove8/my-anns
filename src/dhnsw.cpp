@@ -45,7 +45,7 @@ MMR(Neighbors res, IndexOracle<float>* oracle, int topk, float lambda) {
         r.flag = false;
     }
     while (ret.size() < topk) {
-        std::vector<std::pair<int, float>> scores;
+        std::vector<std::pair<int, float> > scores;
         for (int idx = 1; idx < res.size(); ++idx) {
             if (res[idx].flag)
                 continue;

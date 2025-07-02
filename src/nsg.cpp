@@ -4,34 +4,6 @@ nsg::NSG::NSG(DatasetPtr& dataset, unsigned int K, unsigned int L, unsigned int 
     : Index(dataset), L_(L), m_(m), K_(K) {
 }
 
-//void
-//nsg::NSG::build() {
-//    auto* center = new float[oracle_->dim()];
-//    for (unsigned i = 0; i < oracle_->size(); ++i) {
-//        auto pt = (*oracle_)[i];
-//        for (unsigned j = 0; j < oracle_->dim(); ++j) {
-//            center[j] += pt[j];
-//        }
-//    }
-//    for (unsigned i = 0; i < oracle_->dim(); ++i) {
-//        center[i] /= oracle_->size();
-//    }
-//    root = knn_search(oracle_.get(), graph_, center, 1, L_)[0].id;
-//    delete center;
-//    logger << "Root: " << root << std::endl;
-//
-//    for (int u = 0; u < graph_.size(); ++u) {
-//        if (u % 10000 == 0) {
-//            logger << "Adding " << u << " / " << graph_.size() << std::endl;
-//        }
-//        std::vector<Neighbor> candidates =
-//            track_search(oracle_.get(), graph_, (*oracle_)[u], root, L_);
-//        graph_[u].candidates_ = prune(candidates);
-//    }
-//
-//    tree();
-//}
-
 //TODO Extract pruning strategy to a separate class like metrics
 std::vector<Neighbor>
 nsg::NSG::prune(std::vector<Neighbor>& candidates) {
@@ -168,4 +140,12 @@ Neighbors
 nsg::NSG::search(const float* query, unsigned int topk, unsigned int L) const {
     return graph::search(
         oracle_.get(), visited_list_pool_.get(), flatten_graph_, query, topk, L, root);
+}
+void
+nsg::NSG::print_info() const {
+    Index::print_info();
+    logger << "NSG index: " << std::endl;
+    logger << "  L: " << L_ << std::endl;
+    logger << "  m: " << m_ << std::endl;
+    logger << "  K: " << K_ << std::endl;
 }

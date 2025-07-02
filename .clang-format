@@ -14,7 +14,7 @@ IndentWidth: 4
 
 # Appended Options
 SortIncludes: true
-Standard: Latest
+Standard: Cpp03
 BinPackParameters: false
 BinPackArguments: false
 ReflowComments: false

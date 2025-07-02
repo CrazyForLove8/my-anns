@@ -50,7 +50,7 @@ mergeExp1_2(DatasetPtr& dataset) {
     std::cout << "Dataset name: " << dataset->getName() << " size: " << dataset->getSize()
               << std::endl;
 
-    std::vector<std::pair<int, int>> params = {
+    std::vector<std::pair<int, int> > params = {
         {6, 250}, {8, 250}, {10, 250}, {12, 250}, {14, 250}, {16, 250}};
     for (auto param : params) {
         omp_set_num_threads(20);
@@ -123,7 +123,7 @@ mergeExp2_2(DatasetPtr& dataset) {
     std::cout << "Dataset name: " << dataset->getName() << " size: " << dataset->getSize()
               << std::endl;
 
-    std::vector<std::pair<int, int>> params = {{64, 200}};
+    std::vector<std::pair<int, int> > params = {{64, 200}};
     for (auto param : params) {
         auto datasets = std::vector<DatasetPtr>();
         int num_splits = 2;

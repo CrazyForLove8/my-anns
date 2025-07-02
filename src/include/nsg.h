@@ -67,6 +67,9 @@ public:
 
     Neighbors
     search(const float* query, unsigned int topk, unsigned int L) const override;
+
+    void
+    print_info() const override;
 };
 
 }  // namespace nsg

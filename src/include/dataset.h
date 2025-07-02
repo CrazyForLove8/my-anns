@@ -6,15 +6,15 @@
 #define MYANNS_DATASET_H
 
 #include <unordered_set>
-#include "metric.h"
 #include "dtype.h"
+#include "metric.h"
 #include "visittable.h"
 
 using namespace graph;
 
 namespace graph {
 
-std::vector<std::vector<unsigned int>>
+std::vector<std::vector<unsigned int> >
 loadGroundTruth(const std::string& filename, unsigned int qsize, unsigned int K = 100);
 
 /* Default is L2 */
@@ -39,6 +39,9 @@ private:
 
     void
     load();
+
+    void
+    createOracle();
 
 public:
     Dataset();
@@ -83,16 +86,16 @@ public:
     getSize();
 
     Matrix<float>&
-    getBase();
+    getBase() const;
 
     MatrixPtr<float>&
     getBasePtr();
 
     Matrix<float>&
-    getQuery();
+    getQuery() const;
 
     Matrix<int>&
-    getGroundTruth();
+    getGroundTruth() const;
 
     OraclePtr&
     getOracle();
@@ -104,13 +107,16 @@ public:
     getVisitedListPool();
 
     void
-    split(std::vector<std::shared_ptr<Dataset>>& datasets, unsigned int num);
+    split(std::vector<std::shared_ptr<Dataset> >& datasets, unsigned int num);
+
+    std::vector<std::shared_ptr<Dataset> >
+    subsets(unsigned int num) const;
 
     void
-    merge(std::vector<std::shared_ptr<Dataset>>& datasets);
+    merge(std::vector<std::shared_ptr<Dataset> >& datasets);
 
     static std::shared_ptr<Dataset>
-    aggregate(std::vector<std::shared_ptr<Dataset>>& datasets);
+    aggregate(std::vector<std::shared_ptr<Dataset> >& datasets);
 };
 
 using DatasetPtr = std::shared_ptr<Dataset>;
