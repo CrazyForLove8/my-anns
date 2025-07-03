@@ -148,6 +148,7 @@ mgraph_merge(DatasetPtr& dataset,
         }
     }
     MGraph mgraph(dataset, k, ef_construction);
+    mgraph.set_serial(std::to_string(index_type));
     omp_set_num_threads(num_threads);
     mgraph.Combine(vec);
 

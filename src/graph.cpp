@@ -459,7 +459,7 @@ graph::track_search(IndexOracle<float>* oracle,
     return track;
 }
 
-std::string graph_output_dir = "/root/code/algotests/myanns/outputs/";
+std::string graph_output_dir = "./graph_output/";
 std::string
 get_path(std::string filename) {
     if (filename.find(".bin") == std::string::npos) {

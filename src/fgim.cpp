@@ -16,10 +16,56 @@ FGIM::FGIM(DatasetPtr& dataset, unsigned int max_degree, float sample_rate, bool
       sample_rate_(sample_rate) {
 }
 
+// TODO In the future, we will support loading from a file for each index type.
+void
+FGIM::load_latest(Graph& graph, const std::filesystem::path& directoryPath) {
+    std::filesystem::path latestFilePath;
+    int maxIteration = -1;
+
+    if (!std::filesystem::exists(directoryPath) || !std::filesystem::is_directory(directoryPath)) {
+        std::filesystem::create_directories(directoryPath);
+        return;
+    }
+
+    std::string fileBasePrefix = "fgim_";
+    std::string fileMiddlePart = dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_);
+    std::string iterationSuffixPrefix = "_iter_";
+    std::string fileExtension = ".bin";
+
+    for (const auto& entry : std::filesystem::directory_iterator(directoryPath)) {
+        if (entry.is_regular_file()) {
+            std::string filename = entry.path().filename().string();
+            if (filename.rfind(fileBasePrefix, 0) == 0 &&
+                filename.find(fileMiddlePart) != std::string::npos &&
+                filename.rfind(iterationSuffixPrefix) != std::string::npos &&
+                filename.rfind(fileExtension) == filename.length() - fileExtension.length()) {
+                size_t iterPrefixPos = filename.rfind(iterationSuffixPrefix);
+                if (iterPrefixPos == std::string::npos)
+                    continue;
+                size_t iterStart = iterPrefixPos + iterationSuffixPrefix.length();
+                size_t iterEnd = filename.rfind(fileExtension);
+                if (iterEnd != std::string::npos && iterStart < iterEnd) {
+                    std::string iterStr = filename.substr(iterStart, iterEnd - iterStart);
+                    int currentIteration = std::stoi(iterStr);
+                    if (currentIteration > maxIteration) {
+                        maxIteration = currentIteration;
+                        latestFilePath = entry.path();
+                    }
+                }
+            }
+        }
+    }
+
+    if (maxIteration != -1) {
+        loadGraph(graph, latestFilePath, dataset_->getOracle());
+        start_iter_ = maxIteration + 1;
+    }
+}
+
 void
 FGIM::update_neighbors(Graph& graph) {
     // FIXME Segmentation Fault???
-    size_t it = 0;
+    size_t it = start_iter_;
     unsigned samples = sample_rate_ * max_base_degree_;
     while (++it && it <= ITER_MAX) {
         int cnt = 0;
@@ -83,6 +129,9 @@ FGIM::update_neighbors(Graph& graph) {
                         if (_new[i] == _new[j]) {
                             continue;
                         }
+                        // if (are_in_same_index(_new[i], _new[j])) {
+                        //     continue;
+                        // }
                         auto dist = (*oracle_)(_new[i], _new[j]);
                         if (dist < graph[_new[i]].candidates_.front().distance ||
                             dist < graph[_new[j]].candidates_.front().distance) {
@@ -94,6 +143,9 @@ FGIM::update_neighbors(Graph& graph) {
                         if (_new[i] == _old[j]) {
                             continue;
                         }
+                        // if (are_in_same_index(_new[i], _old[j])) {
+                        //     continue;
+                        // }
                         auto dist = (*oracle_)(_new[i], _old[j]);
                         if (dist < graph[_new[i]].candidates_.front().distance ||
                             dist < graph[_old[j]].candidates_.front().distance) {
@@ -108,6 +160,11 @@ FGIM::update_neighbors(Graph& graph) {
         logger << "Iteration " << it << " with " << cnt << " new edges" << std::endl;
         unsigned convergence = std::lround(THRESHOLD * static_cast<float>(graph.size()) *
                                            static_cast<float>(max_base_degree_));
+        if (it % 5 == 0) {
+            saveGraph(graph,
+                      "fgim_" + dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_) +
+                          "_iter_" + std::to_string(it) + ".bin");
+        }
         //        connect_no_indegree(graph);
         if (cnt <= convergence) {
             break;
@@ -525,14 +582,19 @@ FGIM::Combine(std::vector<IndexPtr>& indexes) {
 
     for (auto& u : graph_) {
         u.candidates_.reserve(max_base_degree_);
-        u.new_.reserve(max_base_degree_);
-        u.old_.reserve(max_base_degree_);
     }
+
+    load_latest(graph_);
 
     Timer timer;
     timer.start();
 
-    CrossQuery(indexes);
+    if (start_iter_ == 0) {
+        logger << "Start merging index from scratch." << std::endl;
+        CrossQuery(indexes);
+    } else {
+        logger << "Start merging index from iteration " << start_iter_ << std::endl;
+    }
 
     Refinement();
 
@@ -543,6 +605,15 @@ FGIM::Combine(std::vector<IndexPtr>& indexes) {
     built_ = true;
 }
 
+void
+FGIM::set_serial(const std::string& serial) {
+    serial_ = serial;
+}
+
+const std::string&
+FGIM::get_serial() const {
+    return  serial_;
+}
 void
 FGIM::print_info() const {
     Index::print_info();

@@ -23,6 +23,11 @@ protected:
 
     std::vector<size_t> offsets_;
 
+    size_t start_iter_{};
+
+    //TODO we can support index_name_ for each index
+    std::string serial_;
+
     virtual void
     CrossQuery(std::vector<IndexPtr>& indexes);
 
@@ -41,8 +46,11 @@ protected:
     void
     connect_no_indegree(Graph& graph);
 
-    bool
+    [[nodiscard]] bool
     are_in_same_index(size_t id1, size_t id2) const;
+
+    void
+    load_latest(Graph& graph, const std::filesystem::path& directoryPath = "./graph_output/");
 
 public:
     static constexpr unsigned ITER_MAX = 30;
@@ -61,6 +69,12 @@ public:
 
     virtual void
     Combine(std::vector<IndexPtr>& indexes);
+
+    void
+    set_serial(const std::string& serial);
+
+    [[nodiscard]] const std::string&
+    get_serial() const;
 
     void
     print_info() const override;

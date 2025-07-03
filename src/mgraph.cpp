@@ -63,7 +63,7 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     }
 
     size_t offset = 0;
-    std::vector<size_t> offsets;
+    offsets_.clear();
     if (isHGraph) {
         for (auto& g : hgraphs) {
             auto& graph_ref = g.get();
@@ -79,7 +79,7 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
                                graph_[0][i + offset].candidates_.end());
             }
             offset += graph_ref[0].size();
-            offsets.emplace_back(offset);
+            offsets_.emplace_back(offset);
         }
     } else {
         for (auto& g : graphs) {
@@ -96,7 +96,7 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
                                graph_[0][i + offset].candidates_.end());
             }
             offset += graph_ref.size();
-            offsets.emplace_back(offset);
+            offsets_.emplace_back(offset);
         }
     }
 
@@ -120,14 +120,14 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     logger << "ef_construction: " << L << std::endl;
 #pragma omp parallel for schedule(dynamic)
     for (int u = 0; u < oracle_->size(); ++u) {
-        auto cur_graph_idx = std::upper_bound(offsets.begin(), offsets.end(), u) - offsets.begin();
+        auto cur_graph_idx = std::upper_bound(offsets_.begin(), offsets_.end(), u) - offsets_.begin();
         auto data = (*oracle_)[u];
 
         for (size_t graph_idx = 0; graph_idx < indexes.size(); graph_idx++) {
             if (graph_idx == cur_graph_idx) {
                 continue;
             }
-            auto _offset = graph_idx == 0 ? 0 : offsets[graph_idx - 1];
+            auto _offset = graph_idx == 0 ? 0 : offsets_[graph_idx - 1];
             auto& index = indexes[graph_idx];
             auto result = index->search(data, L, L);
             for (auto&& res : result) {
@@ -289,15 +289,17 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
             graph_[level][i].candidates_.reserve(max_degree_);
         }
     }
-    for (auto& u : base_layer) {
-        u.new_.reserve(max_base_degree_);
-        u.old_.reserve(max_base_degree_);
-    }
+    load_latest(graph_[0]);
 
     Timer timer;
     timer.start();
 
-    CrossQuery(indexes);
+    if (start_iter_ == 0) {
+        logger << "Start merging index from scratch." << std::endl;
+        CrossQuery(indexes);
+    } else {
+        logger << "Start merging index from iteration " << start_iter_ << std::endl;
+    }
 
     Refinement();
 
