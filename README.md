@@ -5,24 +5,42 @@
 - [Topic](#topic)
 - [Implementation](#implementation)
     - [Algorithms](#algorithms)
-        - [Diversification-based HNSW](#diversification-based-hnsw)
-        - [Sphere-based HNSW](#sphere-based-hnsw)
+      - [Fast Graph-based Index Merging framework](#fast-graph-based-index-merging-framework)
+      - [Diversification-based HNSW](#diversification-based-hnsw)
+      - [Sphere-based HNSW](#sphere-based-hnsw)
     - [Dataset preparation](#dataset-preparation)
     - [Running the code](#running-the-code)
         - [Environment](#environment)
         - [Build](#build)
-        - [Tests](#tests)
 - [Contributions](#contributions)
     - [Formatting the code](#formatting-the-code)
 - [References](#references)
 
-## Topic
+## Topics
 
-Diversified Top-k Retrieval for Approximate Nearest Neighbors Search.
+- Graph-based Indexes Merging.
+
+- Diversified Top-k Retrieval for Approximate Nearest Neighbors Search.
+
+## Experiments
+
+To run the scalability experiments, you can simply run the following command:
+
+```bash
+git clone https://github.com/CrazyForLove8/my-anns
+cd my-anns
+nohup sh run_scal_test.sh &
+```
+
+Two experiments are implemented in the `run_scal_test.sh` (Scalability test for 2 sub-indexes merging) and `run_multiple_scal.sh` (Scalability test for 3~7 sub-indexes merging) scripts, separately.
 
 ## Implementation
 
 ### Algorithms
+
+#### Fast Graph-based Index Merging framework
+
+This framework applies an iterative updating method to merge multiple graph-based indexes.
 
 #### Diversification-based HNSW
 
@@ -65,30 +83,13 @@ original dataset copied 0~5 times randomly.
 
 #### Build
 
+To build your own code, you need to have `CMake` and `GCC` installed.
+
 ```bash
 mkdir build
 cd build
 cmake ..
 make
-```
-
-#### Tests
-
-We provide three tests for the algorithms.
-
-`tests/test_algorithm.cpp` tests the performance of the original HNSW algorithm on the perturbed SIFT10k dataset.
-
-`tests/test_dhnsw.cpp` tests the performance of the diversification-based HNSW algorithm on the perturbed SIFT10k
-dataset.
-
-`tests/test_shnsw.cpp` tests the performance of the sphere-based HNSW algorithm on the perturbed SIFT10k dataset.
-
-To run the tests, execute the following commands:
-
-```bash
-./tests/test_algorithm
-./tests/test_dhnsw
-./tests/test_shnsw
 ```
 
 ## Contributions
