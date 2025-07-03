@@ -196,7 +196,7 @@ MGraph::ReconstructHGraph() {
 
 #pragma omp parallel for schedule(dynamic)
     for (int u = 0; u < oracle_->size(); u++) {
-        int level = levels[u];
+        int level = levels_[u];
         if (level == 0) {
             continue;
         }
@@ -270,11 +270,11 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
 
     int total = oracle_->size();
     std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    levels.reserve(total);
-    levels.resize(total);
+    levels_.reserve(total);
+    levels_.resize(total);
     for (int i = 0; i < total; ++i) {
-        levels[i] = (int)(-log(distribution(random_engine_)) * reverse_);
-        max_level_ = std::max(max_level_, levels[i]);
+        levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels_[i]);
     }
 
     graph_.reserve(max_level_ + 1);
@@ -285,7 +285,7 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
     auto& base_layer = graph_[0];
     for (int i = 0; i < total; ++i) {
         base_layer[i].candidates_.reserve(max_base_degree_);
-        for (int level = 1; level <= levels[i]; ++level) {
+        for (int level = 1; level <= levels_[i]; ++level) {
             graph_[level][i].candidates_.reserve(max_degree_);
         }
     }

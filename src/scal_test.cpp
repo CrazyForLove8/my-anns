@@ -35,7 +35,16 @@ build_sub_indexes(const DatasetPtr& dataset,
     for (auto& data : datasets) {
         std::string output_file = output_path + "/";
         output_file += data->getName() + "_" + std::to_string(split_number) + "_" +
-                       std::to_string(index_type) + "_" + std::to_string(part_id);
+                       std::to_string(index_type) + "_" + std::to_string(part_id) + "_" +
+                       std::to_string(max_neighbors) + "_" + std::to_string(ef_construction) + "_" +
+                       std::to_string(alpha).substr(0, 3) + ".bin";
+        std::cout << "Checking if " << output_file << " exists." << std::endl;
+        if (std::filesystem::exists(output_file)) {
+            std::cout << "Skip " << output_file << ", already exists." << std::endl;
+            part_id++;
+            output_files.emplace_back(output_file);
+            continue;
+        }
         part_id++;
         if (index_type == 0) {
             auto index = std::make_shared<hnsw::HNSW>(data, max_neighbors, ef_construction);
@@ -61,6 +70,15 @@ hnsw_add(DatasetPtr& dataset,
          const int num_threads = 48,
          const int max_neighbors = 32,
          const int ef_construction = 200) {
+    std::string output_file = output_path + "/";
+    output_file += dataset->getName() + "_" + std::to_string(split_number) + "_baseline_hnsw_add" +
+                   "_" + std::to_string(max_neighbors) + "_" + std::to_string(ef_construction) +
+                   ".bin";
+    if (std::filesystem::exists(output_file)) {
+        std::cout << "Skip " << output_file << ", already exists." << std::endl;
+        return;
+    }
+
     HGraph hgraph;
     loadHGraph(hgraph, index_file, dataset->getOracle());
     auto hnsw = std::make_shared<hnsw::HNSW>(dataset, hgraph, true, max_neighbors, ef_construction);
@@ -69,8 +87,6 @@ hnsw_add(DatasetPtr& dataset,
 
     recall(hnsw, dataset);
 
-    std::string output_file = output_path + "/";
-    output_file += dataset->getName() + "_" + std::to_string(split_number) + "_baseline_hnsw_add";
     saveHGraph(hnsw->extractHGraph(), output_file);
 }
 
@@ -81,15 +97,20 @@ vamana_build(DatasetPtr& dataset,
              const int ef_construction = 200,
              const int max_neighbors = 32,
              const float alpha = 1.2) {
+    std::string output_file = output_path + "/";
+    output_file += dataset->getName() + "_vamana_build" + "_" + std::to_string(ef_construction) +
+                   "_" + std::to_string(max_neighbors) + "_" + std::to_string(alpha) + ".bin";
+    if (std::filesystem::exists(output_file)) {
+        std::cout << "Skip " << output_file << ", already exists." << std::endl;
+        return;
+    }
+
     auto vamana = std::make_shared<diskann::Vamana>(dataset, alpha, ef_construction, max_neighbors);
     omp_set_num_threads(num_threads);
     vamana->build();
 
     recall(vamana, dataset);
 
-    std::string output_file = output_path + "/";
-    std::string dataset_name = dataset->getName();
-    output_file += dataset_name + "_vamana_build";
     saveGraph(vamana->extractGraph(), output_file);
 }
 
@@ -101,6 +122,15 @@ mgraph_merge(DatasetPtr& dataset,
              const int index_type = 0,
              const int k = 20,
              const int ef_construction = 200) {
+    std::string output_file = output_path + "/";
+    output_file += dataset->getName() + "_" + std::to_string(subindex_files.size()) + "_ours" +
+                   "_" + std::to_string(k) + "_index_type_" + std::to_string(index_type) + "_k_" +
+                   std::to_string(k) + "_ef_" + std::to_string(ef_construction) + ".bin";
+    if (std::filesystem::exists(output_file)) {
+        std::cout << "Skip creating" << output_file << ", already exists." << std::endl;
+        return;
+    }
+
     auto datasets = dataset->subsets(subindex_files.size());
 
     std::vector<IndexPtr> vec(subindex_files.size());
@@ -123,9 +153,6 @@ mgraph_merge(DatasetPtr& dataset,
 
     recall(mgraph, dataset);
 
-    std::string output_file = output_path + "/";
-    output_file += dataset->getName() + "_" + std::to_string(subindex_files.size()) + "_ours" +
-                   "_" + std::to_string(k) + "_index_type_" + std::to_string(index_type);
     saveHGraph(mgraph.extractHGraph(), output_file);
 }
 
@@ -152,6 +179,32 @@ main(int argc, char* argv[]) {
     int max_neighbors = std::stoi(argv[9]);
     int ef_construction = std::stoi(argv[10]);
     float alpha = std::stof(argv[11]);
+
+    // std::filesystem::path originalPath(output_path);
+    // if (std::filesystem::exists(originalPath)) {
+    //     if (!std::filesystem::is_directory(originalPath)) {
+    //         std::filesystem::path newDirectoryName = originalPath.filename().string() + "_" + Log::getTimestamp();
+    //         std::filesystem::path newDirectoryPath = originalPath.parent_path() / newDirectoryName;
+    //         std::filesystem::create_directories(newDirectoryPath);
+    //         output_path = newDirectoryPath.string();
+    //     } else {
+    //         bool empty = true;
+    //         for (const auto& entry : std::filesystem::directory_iterator(originalPath)) {
+    //             if (entry.is_regular_file() || entry.is_directory()) {
+    //                     empty = false;
+    //                     break;
+    //             }
+    //         }
+    //         if (!empty) {
+    //             std::filesystem::path newDirectoryName = originalPath.filename().string() + "_" + Log::getTimestamp();
+    //             std::filesystem::path newDirectoryPath = originalPath.parent_path() / newDirectoryName;
+    //             std::filesystem::create_directories(newDirectoryPath);
+    //             output_path = newDirectoryPath.string();
+    //         }
+    //     }
+    // } else {
+    //     std::filesystem::create_directories(originalPath);
+    // }
 
     Log::setVerbose(true);
     Log::redirect(output_path);

@@ -26,7 +26,7 @@ private:
 
     uint32_t cur_max_level_;
 
-    std::vector<uint32_t> levels;
+    std::vector<uint32_t> levels_;
 
     std::mutex graph_lock_;
 
