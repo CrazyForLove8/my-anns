@@ -34,6 +34,8 @@ nohup sh run_scal_test.sh &
 
 Two experiments are implemented in the `run_scal_test.sh` (Scalability test for 2 sub-indexes merging) and `run_multiple_scal.sh` (Scalability test for 3~7 sub-indexes merging) scripts, separately.
 
+The dataset path in these scripts should be modified to the path where you have downloaded the dataset.
+
 ## Implementation
 
 ### Algorithms
