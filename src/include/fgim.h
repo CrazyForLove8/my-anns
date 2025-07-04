@@ -23,7 +23,9 @@ protected:
 
     std::vector<size_t> offsets_;
 
-    size_t start_iter_{};
+    size_t start_iter_{0};
+
+    size_t max_index_size_{0};
 
     //TODO we can support index_name_ for each index
     std::string serial_;

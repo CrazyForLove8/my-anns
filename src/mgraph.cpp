@@ -67,8 +67,9 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     if (isHGraph) {
         for (auto& g : hgraphs) {
             auto& graph_ref = g.get();
+            auto graph_size = graph_ref[0].size();
 #pragma omp parallel for schedule(dynamic)
-            for (size_t i = 0; i < graph_ref[0].size(); ++i) {
+            for (size_t i = 0; i < graph_size; ++i) {
                 auto& neighbors = graph_ref[0][i].candidates_;
                 for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
                     auto& neighbor = neighbors[j];
@@ -78,14 +79,16 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
                 std::make_heap(graph_[0][i + offset].candidates_.begin(),
                                graph_[0][i + offset].candidates_.end());
             }
-            offset += graph_ref[0].size();
+            offset += graph_size;
+            max_index_size_ = std::max(max_index_size_, graph_size);
             offsets_.emplace_back(offset);
         }
     } else {
         for (auto& g : graphs) {
             auto& graph_ref = g.get();
+            auto graph_size = graph_ref.size();
 #pragma omp parallel for schedule(dynamic)
-            for (size_t i = 0; i < graph_ref.size(); ++i) {
+            for (size_t i = 0; i < graph_size; ++i) {
                 auto& neighbors = graph_ref[i].candidates_;
                 for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
                     auto& neighbor = neighbors[j];
@@ -95,7 +98,8 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
                 std::make_heap(graph_[0][i + offset].candidates_.begin(),
                                graph_[0][i + offset].candidates_.end());
             }
-            offset += graph_ref.size();
+            offset += graph_size;
+            max_index_size_ = std::max(max_index_size_, graph_size);
             offsets_.emplace_back(offset);
         }
     }
@@ -289,7 +293,7 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
             graph_[level][i].candidates_.reserve(max_degree_);
         }
     }
-    load_latest(graph_[0]);
+    //    load_latest(graph_[0]);
 
     Timer timer;
     timer.start();
@@ -301,6 +305,12 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
         logger << "Start merging index from iteration " << start_iter_ << std::endl;
     }
 
+    logger << "Max Index Size " << max_index_size_ << std::endl;
+    logger << "Offsets:";
+    for (auto& v : offsets_) {
+        logger << " " << v;
+    }
+    logger << std::endl;
     Refinement();
 
     ReconstructHGraph();

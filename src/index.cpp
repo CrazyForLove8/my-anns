@@ -101,7 +101,9 @@ Index::print_info() const {
 #pragma omp parallel
     {
 #pragma omp single
-        { logger << "  Number of threads: " << omp_get_num_threads() << std::endl; }
+        {
+            logger << "Number of threads: " << omp_get_num_threads() << std::endl;
+        }
     }
 }
 

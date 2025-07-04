@@ -4,7 +4,7 @@ using namespace graph;
 
 bool Log::verbose = false;
 bool Log::newLine = true;
-std::string Log::dir = "/root/mount/my-anns/output/logs";
+std::string Log::dir = "./logs";
 std::ofstream Log::logFile;
 std::mutex Log::mutex;
 

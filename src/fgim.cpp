@@ -129,9 +129,9 @@ FGIM::update_neighbors(Graph& graph) {
                         if (_new[i] == _new[j]) {
                             continue;
                         }
-                        // if (are_in_same_index(_new[i], _new[j])) {
-                        //     continue;
-                        // }
+                        if (are_in_same_index(_new[i], _new[j])) {
+                            continue;
+                        }
                         auto dist = (*oracle_)(_new[i], _new[j]);
                         if (dist < graph[_new[i]].candidates_.front().distance ||
                             dist < graph[_new[j]].candidates_.front().distance) {
@@ -143,9 +143,9 @@ FGIM::update_neighbors(Graph& graph) {
                         if (_new[i] == _old[j]) {
                             continue;
                         }
-                        // if (are_in_same_index(_new[i], _old[j])) {
-                        //     continue;
-                        // }
+                        if (are_in_same_index(_new[i], _old[j])) {
+                            continue;
+                        }
                         auto dist = (*oracle_)(_new[i], _old[j]);
                         if (dist < graph[_new[i]].candidates_.front().distance ||
                             dist < graph[_old[j]].candidates_.front().distance) {
@@ -160,11 +160,11 @@ FGIM::update_neighbors(Graph& graph) {
         logger << "Iteration " << it << " with " << cnt << " new edges" << std::endl;
         unsigned convergence = std::lround(THRESHOLD * static_cast<float>(graph.size()) *
                                            static_cast<float>(max_base_degree_));
-        if (it % 5 == 0) {
-            saveGraph(graph,
-                      "fgim_" + dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_) +
-                          "_iter_" + std::to_string(it) + ".bin");
-        }
+        //        if (it % 5 == 0) {
+        //            saveGraph(graph,
+        //                      "fgim_" + dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_) +
+        //                          "_iter_" + std::to_string(it) + ".bin");
+        //        }
         //        connect_no_indegree(graph);
         if (cnt <= convergence) {
             break;
@@ -451,13 +451,17 @@ FGIM::are_in_same_index(size_t id1, size_t id2) const {
         return false;
     }
 
+    size_t diff = (id1 > id2) ? (id1 - id2) : (id2 - id1);
+    if (diff >= max_index_size_) {
+        return false;
+    }
+
     auto it1 = std::upper_bound(offsets_.begin(), offsets_.end(), id1);
-    size_t bucket_id1 = std::distance(offsets_.begin(), it1);
+    size_t bucket_id = std::distance(offsets_.begin(), it1);
 
-    auto it2 = std::upper_bound(offsets_.begin(), offsets_.end(), id2);
-    size_t bucket_id2 = std::distance(offsets_.begin(), it2);
-
-    return bucket_id1 == bucket_id2;
+    size_t start = (bucket_id == 0) ? 0 : offsets_[bucket_id - 1];
+    size_t end = offsets_[bucket_id];
+    return id2 >= start && id2 < end;
 }
 
 void
@@ -483,8 +487,9 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
     if (isHGraph) {
         for (auto& g : hgraphs) {
             auto& graph_ref = g.get();
+            auto graph_size = graph_ref[0].size();
 #pragma omp parallel for schedule(dynamic)
-            for (size_t i = 0; i < graph_ref[0].size(); ++i) {
+            for (size_t i = 0; i < graph_size; ++i) {
                 auto& neighbors = graph_ref[0][i].candidates_;
                 for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
                     auto& neighbor = neighbors[j];
@@ -494,14 +499,16 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
                 std::make_heap(graph_[i + offset].candidates_.begin(),
                                graph_[i + offset].candidates_.end());
             }
-            offset += graph_ref[0].size();
+            offset += graph_size;
+            max_index_size_ = std::max(max_index_size_, graph_size);
             offsets_.emplace_back(offset);
         }
     } else {
         for (auto& g : graphs) {
             auto& graph_ref = g.get();
+            auto graph_size = graph_ref.size();
 #pragma omp parallel for schedule(dynamic)
-            for (size_t i = 0; i < graph_ref.size(); ++i) {
+            for (size_t i = 0; i < graph_size; ++i) {
                 auto& neighbors = graph_ref[i].candidates_;
                 for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
                     auto& neighbor = neighbors[j];
@@ -511,7 +518,8 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
                 std::make_heap(graph_[i + offset].candidates_.begin(),
                                graph_[i + offset].candidates_.end());
             }
-            offset += graph_ref.size();
+            offset += graph_size;
+            max_index_size_ = std::max(max_index_size_, graph_size);
             offsets_.emplace_back(offset);
         }
     }
