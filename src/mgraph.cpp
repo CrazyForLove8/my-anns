@@ -124,7 +124,8 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     logger << "ef_construction: " << L << std::endl;
 #pragma omp parallel for schedule(dynamic)
     for (int u = 0; u < oracle_->size(); ++u) {
-        auto cur_graph_idx = std::upper_bound(offsets_.begin(), offsets_.end(), u) - offsets_.begin();
+        auto cur_graph_idx =
+            std::upper_bound(offsets_.begin(), offsets_.end(), u) - offsets_.begin();
         auto data = (*oracle_)[u];
 
         for (size_t graph_idx = 0; graph_idx < indexes.size(); graph_idx++) {

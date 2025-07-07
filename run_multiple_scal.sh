@@ -3,11 +3,13 @@
 BUILD_DIR="build"
 TEST_EXEC="scal_test"
 
-DATASET_BASE="/root/mount/dataset/siftsmall/siftsmall_base.fvecs"
-DATASET_QUERY="/root/mount/dataset/siftsmall/siftsmall_query.fvecs"
-DATASET_GROUNDTRUTH="/root/mount/dataset/siftsmall/siftsmall_groundtruth.ivecs"
-METRIC="l2" # l2, cosine
-OUTPUT_PATH="/root/mount/my-anns/output/siftsmall/" # 日志输出目录、构建好的索引输出目录
+DATASET_BASE="/root/mount/dataset/internet_search/internet_search_train.fbin"
+DATASET_QUERY="/root/mount/dataset/internet_search/internet_search_test.fbin"
+DATASET_GROUNDTRUTH="/root/mount/dataset/internet_search/internet_search_neighbors.fbin"
+# l2, cosine
+METRIC="l2"
+# 日志输出目录、构建好的索引输出目录
+OUTPUT_PATH="/root/mount/my-anns/output/internet_test_with_filter_multiple/"
 THREAD_NUM=48 # 运行线程数
 K=20 # 我们的方法的参数
 MAX_NEIGHBOR=32 # HNSW & Vamana 共享的参数

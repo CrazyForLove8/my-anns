@@ -28,7 +28,8 @@ FGIM::load_latest(Graph& graph, const std::filesystem::path& directoryPath) {
     }
 
     std::string fileBasePrefix = "fgim_";
-    std::string fileMiddlePart = dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_);
+    std::string fileMiddlePart =
+        dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_);
     std::string iterationSuffixPrefix = "_iter_";
     std::string fileExtension = ".bin";
 
@@ -620,7 +621,7 @@ FGIM::set_serial(const std::string& serial) {
 
 const std::string&
 FGIM::get_serial() const {
-    return  serial_;
+    return serial_;
 }
 void
 FGIM::print_info() const {

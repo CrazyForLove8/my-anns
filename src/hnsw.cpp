@@ -316,7 +316,7 @@ hnsw::HNSW::build_internal() {
     int total = (int)oracle_->size();
 #pragma omp parallel for schedule(dynamic)
     for (int i = 1; i < total; ++i) {
-        if (i % 10000 == 0) {
+        if (i % 100000 == 0) {
             logger << "Adding " << i << " / " << total << std::endl;
         }
         addPoint(i);
