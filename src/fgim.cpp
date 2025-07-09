@@ -166,7 +166,7 @@ FGIM::update_neighbors(Graph& graph) {
         //                      "fgim_" + dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_) +
         //                          "_iter_" + std::to_string(it) + ".bin");
         //        }
-        //        connect_no_indegree(graph);
+        connect_no_indegree(graph);
         if (cnt <= convergence) {
             break;
         }

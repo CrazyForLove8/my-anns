@@ -90,7 +90,10 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             for (int i = 20; i <= 100; i += 5) {
                 search_Ls.push_back(i);
             }
-            for (int i = 100; i <= 800; i += 10) {
+            for (int i = 100; i <= 400; i += 10) {
+                search_Ls.push_back(i);
+            }
+            for (int i = 500; i <= 1000; i += 100) {
                 search_Ls.push_back(i);
             }
         }

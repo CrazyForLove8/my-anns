@@ -321,41 +321,79 @@ mergeExp6_2(DatasetPtr& dataset) {
 
 void
 mergeExp6_3(DatasetPtr& dataset) {
+    Log::redirect("6.3_" + dataset->getName() + "_repair_no_in_degree");
     std::cout << "Exp6.3: Repair no in-degree\n";
+    //    std::cout << "Baseline" << std::endl;
     std::cout << "Current Time: " << Log::getTimestamp() << "\n";
     std::cout << "Dataset name: " << dataset->getName() << " size: " << dataset->getSize()
               << std::endl;
 
-    auto datasets = std::vector<DatasetPtr>();
-
     int num_splits = 2;
     std::cout << "Number of splits: " << num_splits << std::endl;
-    dataset->split(datasets, num_splits);
-
-    datasets.insert(datasets.begin(), dataset);
-    auto merged_dataset = Dataset::aggregate(datasets);
+    auto datasets = dataset->subsets(num_splits);
 
     omp_set_num_threads(20);
     std::vector<IndexPtr> vec(datasets.size());
-    vec[0] = std::make_shared<hnsw::HNSW>(dataset, 8, 200);
-    vec[0]->build();
-    for (size_t i = 1; i < datasets.size(); i++) {
-        vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], 8, 200);
+    for (size_t i = 0; i < datasets.size(); i++) {
+        vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], 32, 200);
         vec[i]->build();
     }
-    //    omp_set_num_threads(1);
     {
         std::cout << "Parameter: Max degree: " << 16 << std::endl;
-        MGraph mgraph(merged_dataset, 8, 200);
+        MGraph mgraph(dataset, 32, 200);
         mgraph.Combine(vec);
-        recall(mgraph, merged_dataset, 200);
+        recall(mgraph, dataset);
 
         auto& graph = mgraph.extractHGraph();
 
         std::cout << checkConnectivity(graph[0]) << std::endl;
     }
+}
 
-    dataset = merged_dataset;
+void
+exp_multiple(DatasetPtr& dataset) {
+    Log::redirect("mul_" + dataset->getName() + "_ours");
+    std::cout << "Current Time: " << Log::getTimestamp() << "\n";
+
+    omp_set_num_threads(20);
+    auto split = {3, 4, 5, 6, 7};
+    int max_degree;
+    if (dataset->getName() == "crawl" || dataset->getName() == "gist" ||
+        dataset->getName() == "glove") {
+        max_degree = 32;
+    } else {
+        max_degree = 16;
+    }
+    std::cout << "Our method" << std::endl;
+    for (auto num_split : split) {
+        std::cout << "Number of splits: " << num_split << std::endl;
+        auto datasets = dataset->subsets(num_split);
+
+        std::vector<IndexPtr> vec(datasets.size());
+        for (size_t i = 0; i < datasets.size(); i++) {
+            vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], max_degree, 200);
+            vec[i]->build();
+        }
+
+        MGraph mgraph(dataset, max_degree, 200);
+        mgraph.Combine(vec);
+        recall(mgraph, dataset);
+    }
+
+    std::cout << "Baseline method" << std::endl;
+    for (auto num_split : split) {
+        std::cout << "Number of splits: " << num_split << std::endl;
+        auto datasets = dataset->subsets(num_split);
+
+        auto hnsw = std::make_shared<hnsw::HNSW>(datasets[0], max_degree, 200);
+        hnsw->build();
+
+        auto another =
+            std::make_shared<hnsw::HNSW>(dataset, hnsw->extractHGraph(), true, max_degree, 200);
+        another->partial_build();
+
+        recall(another, dataset);
+    }
 }
 
 void
@@ -431,13 +469,22 @@ mergeExp10(DatasetPtr& dataset) {
     }
 }
 
+#define ALARM_FINISHED 1
+
 int
 main() {
     Log::setVerbose(true);
 
-    auto dataset = Dataset::getInstance("crawl", "1m");
+    auto dataset = Dataset::getInstance("sift", "1m");
 
-    mergeExp6_2(dataset);
+    exp_multiple(dataset);
+
+#if ALARM_FINISHED
+    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
+    if (ret != 0) {
+        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
+    }
+#endif
 
     return 0;
 }
