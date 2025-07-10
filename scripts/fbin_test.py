@@ -1,4 +1,5 @@
 from vecs_util import *
+import numpy as np
 
 def fbin_read(fname):
     with open(fname, 'rb') as f:
@@ -13,6 +14,14 @@ def fbin_read(fname):
             vectors.append(vector)
     return numpy.array(vectors)
 
+def load_memmap_file_original(filename):
+    data = np.memmap(filename, dtype=np.uint8, mode='r')
+    header = data[:8].view(dtype=np.int32)
+    count, dim = header[0], header[1]
+    rest_data = data[8:].view(dtype=np.float32)
+    array = rest_data.reshape(count, dim)
+    return dim, count, array
+
 if __name__ == "__main__":
-    base = fbin_read("/root/mount/dataset/internet_search/internet_search_train.fbin")
-    print("Base shape: " + str(base.shape))
+    dim, count, array = load_memmap_file_original("/root/mount/tmp/msmar_query.bin")
+    print("Loaded " + str(count) + " vectors of dimension " + str(dim))

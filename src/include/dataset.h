@@ -10,8 +10,6 @@
 #include "metric.h"
 #include "visittable.h"
 
-using namespace graph;
-
 namespace graph {
 
 std::vector<std::vector<unsigned int> >
@@ -109,7 +107,7 @@ public:
     void
     split(std::vector<std::shared_ptr<Dataset> >& datasets, unsigned int num);
 
-    std::vector<std::shared_ptr<Dataset> >
+    [[nodiscard]] std::vector<std::shared_ptr<Dataset> >
     subsets(unsigned int num) const;
 
     void

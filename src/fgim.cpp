@@ -170,6 +170,14 @@ FGIM::update_neighbors(Graph& graph) {
         if (cnt <= convergence) {
             break;
         }
+
+        if (save_helper_.is_enabled() && it % save_helper_.save_frequency == 0) {
+            auto path = append(save_helper_.save_path, cur_phase_);
+            logger << "Saving temporary index to " << path << std::endl;
+            check_and_remove(path);
+            saveGraph(graph, path);
+            logger << "Saved index at iteration " << it << " to " << path << std::endl;
+        }
     }
 }
 

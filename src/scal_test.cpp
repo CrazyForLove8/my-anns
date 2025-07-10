@@ -64,12 +64,13 @@ build_sub_indexes(const DatasetPtr& dataset,
 
 void
 hnsw_add(DatasetPtr& dataset,
-         const std::string& index_file,
+         std::string& index_file,
          const int split_number,
          const std::string& output_path,
          const int num_threads = 48,
          const int max_neighbors = 32,
-         const int ef_construction = 200) {
+         const int ef_construction = 200,
+         const std::string& temp_index_file) {
     std::string output_file = output_path + "/";
     output_file += dataset->getName() + "_" + std::to_string(split_number) + "_baseline_hnsw_add" +
                    "_" + std::to_string(max_neighbors) + "_" + std::to_string(ef_construction) +
@@ -79,9 +80,11 @@ hnsw_add(DatasetPtr& dataset,
         return;
     }
 
-    HGraph hgraph;
-    loadHGraph(hgraph, index_file, dataset->getOracle());
-    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, hgraph, true, max_neighbors, ef_construction);
+    if (temp_index_file != "none") {
+        index_file = temp_index_file;
+    }
+
+    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, index_file, true, max_neighbors, ef_construction);
     omp_set_num_threads(num_threads);
     hnsw->partial_build();
 
@@ -121,7 +124,8 @@ mgraph_merge(DatasetPtr& dataset,
              const int num_threads = 48,
              const int index_type = 0,
              const int k = 20,
-             const int ef_construction = 200) {
+             const int ef_construction = 200,
+             const std::string& temp_index_file = "none") {
     std::string output_file = output_path + "/";
     output_file += dataset->getName() + "_" + std::to_string(subindex_files.size()) + "_ours" +
                    "_" + std::to_string(k) + "_index_type_" + std::to_string(index_type) + "_k_" +
@@ -136,9 +140,7 @@ mgraph_merge(DatasetPtr& dataset,
     std::vector<IndexPtr> vec(subindex_files.size());
     for (size_t i = 0; i < subindex_files.size(); ++i) {
         if (index_type == 0) {
-            HGraph hgraph;
-            loadHGraph(hgraph, subindex_files[i], datasets[i]->getOracle());
-            vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], hgraph);
+            vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], subindex_files[i]);
         } else if (index_type == 1) {
             Graph graph;
             loadGraph(graph, subindex_files[i], datasets[i]->getOracle());
@@ -146,6 +148,11 @@ mgraph_merge(DatasetPtr& dataset,
         } else {
             throw std::invalid_argument("Unsupported index type");
         }
+    }
+    // ?
+    MGraph mgraph(dataset, temp_index_file, k, ef_construction);
+    if (temp_index_file != "none") {
+
     }
     MGraph mgraph(dataset, k, ef_construction);
     mgraph.set_serial(std::to_string(index_type));
@@ -159,10 +166,10 @@ mgraph_merge(DatasetPtr& dataset,
 
 int
 main(int argc, char* argv[]) {
-    if (argc < 12) {
+    if (argc < 15) {
         std::cerr << "Usage: " << argv[0]
                   << " <base_file> <query_file> <gt_file> <metric> <output_path> "
-                     "<split_number> <num_threads> <k> <max_neighbors> <ef_construction> <alpha>"
+                     "<split_number> <num_threads> <k> <max_neighbors> <ef_construction> <alpha> <hnsw_index_path> <mgraph_path> <vamana_index_path>"
                   << std::endl;
         return 1;
     }
@@ -181,50 +188,30 @@ main(int argc, char* argv[]) {
     int ef_construction = std::stoi(argv[10]);
     float alpha = std::stof(argv[11]);
 
-    // std::filesystem::path originalPath(output_path);
-    // if (std::filesystem::exists(originalPath)) {
-    //     if (!std::filesystem::is_directory(originalPath)) {
-    //         std::filesystem::path newDirectoryName = originalPath.filename().string() + "_" + Log::getTimestamp();
-    //         std::filesystem::path newDirectoryPath = originalPath.parent_path() / newDirectoryName;
-    //         std::filesystem::create_directories(newDirectoryPath);
-    //         output_path = newDirectoryPath.string();
-    //     } else {
-    //         bool empty = true;
-    //         for (const auto& entry : std::filesystem::directory_iterator(originalPath)) {
-    //             if (entry.is_regular_file() || entry.is_directory()) {
-    //                     empty = false;
-    //                     break;
-    //             }
-    //         }
-    //         if (!empty) {
-    //             std::filesystem::path newDirectoryName = originalPath.filename().string() + "_" + Log::getTimestamp();
-    //             std::filesystem::path newDirectoryPath = originalPath.parent_path() / newDirectoryName;
-    //             std::filesystem::create_directories(newDirectoryPath);
-    //             output_path = newDirectoryPath.string();
-    //         }
-    //     }
-    // } else {
-    //     std::filesystem::create_directories(originalPath);
-    // }
+    std::string hnsw_index_path = output_path + "/" + argv[12];
+    std::string mgraph_path = output_path + "/" + argv[13];
+    std::string vamana_index_path = output_path + "/" + argv[14];
 
     Log::setVerbose(true);
     Log::redirect(output_path);
 
     auto dataset = get_dataset(base_file, metric, query_file, gt_file);
+    print_memory_usage();
 
     std::cout << "Step 1, build HNSW sub-indexes." << std::endl;
     auto hnsw_indexes =
         build_sub_indexes(dataset, output_path, split_number, 0, max_neighbors, ef_construction);
+    print_memory_usage();
     std::cout << "------------------------------------" << std::endl;
 
     std::cout << "Step 2, use HNSW to insert smaller datasets into larger index." << std::endl;
-    // hnsw_add(dataset,
-    //          hnsw_indexes[0],
-    //          split_number,
-    //          output_path,
-    //          num_threads,
-    //          max_neighbors,
-    //          ef_construction);
+    hnsw_add(dataset,
+             hnsw_indexes[0],
+             split_number,
+             output_path,
+             num_threads,
+             max_neighbors,
+             ef_construction);
     std::cout << "------------------------------------" << std::endl;
 
     std::cout << "Step 3, merge sub-indexes using our method." << std::endl;
@@ -234,15 +221,18 @@ main(int argc, char* argv[]) {
     std::cout << "Step 4, build Vamana sub-indexes." << std::endl;
     auto vamana_indexes = build_sub_indexes(
         dataset, output_path, split_number, 1, max_neighbors, ef_construction, alpha);
+    print_memory_usage();
     std::cout << "------------------------------------" << std::endl;
 
     std::cout << "Step 5, merge sub-indexes using our method." << std::endl;
+    print_memory_usage();
     mgraph_merge(dataset, output_path, vamana_indexes, num_threads, 1, k, ef_construction);
 
     if (split_number == 2) {
         std::cout << "Step 6, reconstruct Vamana index on the full dataset." << std::endl;
         vamana_build(dataset, output_path, num_threads, ef_construction, max_neighbors, alpha);
     }
+    print_memory_usage();
 
     std::cout << "Finished!" << std::endl;
 

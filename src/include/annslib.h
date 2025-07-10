@@ -6,6 +6,7 @@
 #define MYANNS_ANNSLIB_H
 
 #include "evaluator.h"
+#include "memory.h"
 #include "fgim.h"
 #include "hnsw.h"
 #include "mgraph.h"

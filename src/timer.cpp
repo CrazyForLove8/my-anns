@@ -4,6 +4,7 @@ using namespace graph;
 
 Timer::Timer() {
     started = false;
+    _elapsed = 0.0;
 }
 
 void
@@ -22,9 +23,12 @@ Timer::end() {
     }
     started = false;
     _end = std::chrono::steady_clock::now();
+    _elapsed = std::chrono::duration_cast<std::chrono::duration<double> >(_end - _start).count();
 }
 
 double
 Timer::elapsed() const {
-    return std::chrono::duration_cast<std::chrono::duration<double> >(_end - _start).count();
+    return started ?
+        std::chrono::duration_cast<std::chrono::duration<double> >(std::chrono::steady_clock::now() - _start).count() :
+        _elapsed;
 }

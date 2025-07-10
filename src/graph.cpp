@@ -459,42 +459,6 @@ graph::track_search(IndexOracle<float>* oracle,
     return track;
 }
 
-std::string graph_output_dir = "./graph_output/";
-std::string
-get_path(std::string filename) {
-    if (filename.find(".bin") == std::string::npos) {
-        filename += ".bin";
-    }
-    std::filesystem::path p(filename);
-    if (p.is_absolute()) {
-        std::filesystem::path parent_dir = p.parent_path();
-        std::string stem = p.stem().string();
-        std::string extension = p.extension().string();
-
-        if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
-            std::filesystem::create_directories(parent_dir);
-        }
-
-        if (std::filesystem::exists(p)) {
-            std::mt19937 rng(std::random_device{}());
-            std::string new_relative_filename = stem + "_" + std::to_string(rng()) + extension;
-            filename = (parent_dir / new_relative_filename).string();
-        } else {
-            filename = p.string();
-        }
-        return filename;
-    }
-    if (!std::filesystem::exists(graph_output_dir)) {
-        std::filesystem::create_directories(graph_output_dir);
-    }
-    std::filesystem::path pp(graph_output_dir + filename);
-    if (std::filesystem::exists(pp)) {
-        std::mt19937 rng(std::random_device{}());
-        filename = pp.stem().string() + "_" + std::to_string(rng()) + pp.extension().string();
-    }
-    return graph_output_dir + filename;
-}
-
 std::string
 graph::saveGraph(Graph& graph, const std::string& filename) {
     if (graph.empty()) {
@@ -511,6 +475,7 @@ graph::saveGraph(Graph& graph, const std::string& filename) {
     file.write(reinterpret_cast<const char*>(&graph_size), sizeof(graph_size));
 
     for (size_t i = 0; i < graph.size(); ++i) {
+        std::lock_guard<std::mutex> guard(graph[i].lock_);
         file.write(reinterpret_cast<const char*>(&i), sizeof(i));
         size_t num_neighbors = graph[i].candidates_.size();
         file.write(reinterpret_cast<const char*>(&num_neighbors), sizeof(num_neighbors));
@@ -588,6 +553,7 @@ graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
     file.write(reinterpret_cast<const char*>(&graph_size), sizeof(graph_size));
     file.write(reinterpret_cast<const char*>(&max_level), sizeof(max_level));
     for (int64_t i = 0; i < graph_size; ++i) {
+        std::lock_guard<std::mutex> guard(hgraph[0][i].lock_);
         file.write(reinterpret_cast<const char*>(&i), sizeof(i));
         int level = levels[i];
         file.write(reinterpret_cast<const char*>(&level), sizeof(level));

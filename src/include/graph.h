@@ -25,6 +25,7 @@
 #include "dataset.h"
 #include "dtype.h"
 #include "visittable.h"
+#include "output.h"
 
 namespace graph {
 

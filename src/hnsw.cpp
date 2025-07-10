@@ -33,20 +33,22 @@ hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
     }
 }
 
+
 hnsw::HNSW::HNSW(
-    DatasetPtr& dataset, HGraph& graph, bool partial, int max_neighbors, int ef_construction)
+    DatasetPtr& dataset, const std::string& index_file, bool partial, int max_neighbors, int ef_construction)
     : Index(dataset, false),
-      graph_(std::move(graph)),
       max_neighbors_(max_neighbors),
       max_base_neighbors_(max_neighbors * 2),
       ef_construction_(ef_construction) {
     random_engine_.seed(2024);
     reverse_ = 1 / log(1.0 * max_neighbors_);
 
-    for (int i = graph.size() - 1; i >= 0; --i) {
+    loadHGraph(graph_, index_file, dataset_->getOracle());
+
+    for (int i = graph_.size() - 1; i >= 0; --i) {
         bool found = false;
-        for (int j = 0; j < graph[i].size(); ++j) {
-            if (!graph[i][j].candidates_.empty()) {
+        for (int j = 0; j < graph_[i].size(); ++j) {
+            if (!graph_[i][j].candidates_.empty()) {
                 enter_point_ = j;
                 found = true;
                 break;
@@ -64,7 +66,12 @@ hnsw::HNSW::HNSW(
     } else {
         levels_.reserve(oracle_->size());
         levels_.resize(oracle_->size(), 0);
-        cur_size_ = graph_[0].size();
+        auto tmp = get_suffix(index_file);
+        if (tmp != "") {
+            cur_size_ = std::stoull(tmp);
+        } else {
+            cur_size_ = graph_[0].size();
+        }
 
         int total = oracle_->size();
 
@@ -376,6 +383,14 @@ hnsw::HNSW::partial_build(uint64_t num) {
                 logger << "Adding " << i << " / " << end << std::endl;
             }
             addPoint(i);
+
+            if (save_helper_.is_enabled() && i % save_helper_.get_interval() == 0) {
+                auto path = append(save_helper_.save_path, filename_separator() + std::to_string(i));
+                logger << "Saving temporary index to " << path << std::endl;
+                check_prefix_and_remove(path);
+                saveHGraph(graph_, save_helper_.save_path);
+                logger << "Saved index at point " << i << std::endl;
+            }
         }
     }
     timer.end();
@@ -472,4 +487,9 @@ hnsw::HNSW::set_max_neighbors(int max_neighbors) {
 void
 hnsw::HNSW::set_ef_construction(int ef_construction) {
     this->ef_construction_ = ef_construction;
+}
+
+void
+hnsw::HNSW::set_cur_size(uint64_t cur_size) {
+    cur_size_ = cur_size;
 }

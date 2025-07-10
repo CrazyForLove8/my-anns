@@ -33,10 +33,33 @@ MGraph::MGraph(DatasetPtr& dataset,
       reverse_(1 / log(1.0 * max_degree)) {
 }
 
+MGraph::MGraph(DatasetPtr& dataset,
+               std::string& index_path,
+               unsigned int max_degree,
+               unsigned int ef_construction,
+               float sample_rate) :
+      FGIM(dataset, max_degree, sample_rate, false),
+      ef_construction_(ef_construction),
+      random_engine_(2024),
+      enter_point_(0),
+      max_level_(0),
+      cur_max_level_(0),
+      reverse_(1 / log(1.0 * max_degree)) {
+
+    loadGraph(graph_[0], index_path, dataset->getOracle());
+    cur_phase_ = get_suffix(index_path, 1);
+    if (cur_phase_ == "1") {
+        auto tmp = get_suffix(index_path);
+        tmp.pop_back();
+        start_id_ = std::stoull(tmp);
+    }
+
+}
+
 Graph&
 MGraph::extractGraph() {
     throw std::runtime_error(
-        "HNSW does not support extractGraph, please use extractHGraph instead");
+        "MGraph does not support extractGraph, please use extractHGraph instead");
 }
 
 HGraph&
@@ -49,61 +72,62 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     Timer timer;
     timer.start();
 
-    std::vector<std::reference_wrapper<Graph> > graphs;
-    std::vector<std::reference_wrapper<HGraph> > hgraphs;
-    bool isHGraph = true;
-    for (auto& index : indexes) {
-        auto hnsw_index = std::dynamic_pointer_cast<hnsw::HNSW>(index);
-        if (hnsw_index == nullptr) {
-            isHGraph = false;
-            graphs.emplace_back(index->extractGraph());
+    if (start_id_ == 0) {
+        std::vector<std::reference_wrapper<Graph> > graphs;
+        std::vector<std::reference_wrapper<HGraph> > hgraphs;
+        bool isHGraph = true;
+        for (auto& index : indexes) {
+            auto hnsw_index = std::dynamic_pointer_cast<hnsw::HNSW>(index);
+            if (hnsw_index == nullptr) {
+                isHGraph = false;
+                graphs.emplace_back(index->extractGraph());
+            } else {
+                hgraphs.emplace_back(hnsw_index->extractHGraph());
+            }
+        }
+
+        size_t offset = 0;
+        offsets_.clear();
+        if (isHGraph) {
+            for (auto& g : hgraphs) {
+                auto& graph_ref = g.get();
+                auto graph_size = graph_ref[0].size();
+    #pragma omp parallel for schedule(dynamic)
+                for (size_t i = 0; i < graph_size; ++i) {
+                    auto& neighbors = graph_ref[0][i].candidates_;
+                    for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
+                        auto& neighbor = neighbors[j];
+                        graph_[0][i + offset].candidates_.emplace_back(
+                            neighbor.id + offset, neighbor.distance, true);
+                    }
+                    std::make_heap(graph_[0][i + offset].candidates_.begin(),
+                                   graph_[0][i + offset].candidates_.end());
+                }
+                offset += graph_size;
+                max_index_size_ = std::max(max_index_size_, graph_size);
+                offsets_.emplace_back(offset);
+            }
         } else {
-            hgraphs.emplace_back(hnsw_index->extractHGraph());
+            for (auto& g : graphs) {
+                auto& graph_ref = g.get();
+                auto graph_size = graph_ref.size();
+    #pragma omp parallel for schedule(dynamic)
+                for (size_t i = 0; i < graph_size; ++i) {
+                    auto& neighbors = graph_ref[i].candidates_;
+                    for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
+                        auto& neighbor = neighbors[j];
+                        graph_[0][i + offset].candidates_.emplace_back(
+                            neighbor.id + offset, neighbor.distance, true);
+                    }
+                    std::make_heap(graph_[0][i + offset].candidates_.begin(),
+                                   graph_[0][i + offset].candidates_.end());
+                }
+                offset += graph_size;
+                max_index_size_ = std::max(max_index_size_, graph_size);
+                offsets_.emplace_back(offset);
+            }
         }
     }
-
-    size_t offset = 0;
-    offsets_.clear();
-    if (isHGraph) {
-        for (auto& g : hgraphs) {
-            auto& graph_ref = g.get();
-            auto graph_size = graph_ref[0].size();
-#pragma omp parallel for schedule(dynamic)
-            for (size_t i = 0; i < graph_size; ++i) {
-                auto& neighbors = graph_ref[0][i].candidates_;
-                for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
-                    auto& neighbor = neighbors[j];
-                    graph_[0][i + offset].candidates_.emplace_back(
-                        neighbor.id + offset, neighbor.distance, true);
-                }
-                std::make_heap(graph_[0][i + offset].candidates_.begin(),
-                               graph_[0][i + offset].candidates_.end());
-            }
-            offset += graph_size;
-            max_index_size_ = std::max(max_index_size_, graph_size);
-            offsets_.emplace_back(offset);
-        }
-    } else {
-        for (auto& g : graphs) {
-            auto& graph_ref = g.get();
-            auto graph_size = graph_ref.size();
-#pragma omp parallel for schedule(dynamic)
-            for (size_t i = 0; i < graph_size; ++i) {
-                auto& neighbors = graph_ref[i].candidates_;
-                for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
-                    auto& neighbor = neighbors[j];
-                    graph_[0][i + offset].candidates_.emplace_back(
-                        neighbor.id + offset, neighbor.distance, true);
-                }
-                std::make_heap(graph_[0][i + offset].candidates_.begin(),
-                               graph_[0][i + offset].candidates_.end());
-            }
-            offset += graph_size;
-            max_index_size_ = std::max(max_index_size_, graph_size);
-            offsets_.emplace_back(offset);
-        }
-    }
-
     //    logger << "Performing Random Sampling" << std::endl;
     //    std::mt19937_64 rng(2024);
     //#pragma omp parallel for schedule(dynamic)
@@ -123,7 +147,7 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     unsigned L = max_degree_ / (indexes.size() - 1);
     logger << "ef_construction: " << L << std::endl;
 #pragma omp parallel for schedule(dynamic)
-    for (int u = 0; u < oracle_->size(); ++u) {
+    for (int u = start_id_; u < oracle_->size(); ++u) {
         auto cur_graph_idx =
             std::upper_bound(offsets_.begin(), offsets_.end(), u) - offsets_.begin();
         auto data = (*oracle_)[u];
@@ -139,14 +163,26 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
                 graph_[0][u].pushHeap(res.id + _offset, res.distance);
             }
         }
+
+        if (save_helper_.is_enabled() && u % save_helper_.get_interval() == 0) {
+            auto path = append(save_helper_.save_path, filename_separator() + std::to_string(u));
+            path = append(path, cur_phase_);
+            logger << "Saving temporary index to " << path << std::endl;
+            check_and_remove(path);
+            saveGraph(graph_[0], path);
+            logger << "Saved index at point " << u << std::endl;
+        }
     }
 
     timer.end();
     logger << "Cross query time: " << timer.elapsed() << "s" << std::endl;
+    logger << "Cross query finished" << std::endl;
+    print_memory_usage();
 }
 
 void
 MGraph::Refinement() {
+    cur_phase_ = "2";
     Timer timer;
 
     timer.start();
@@ -154,10 +190,10 @@ MGraph::Refinement() {
     timer.end();
     logger << "Iterative update time: " << timer.elapsed() << "s" << std::endl;
 
-    timer.start();
-    //    connect_no_indegree(graph_[0]);
-    timer.end();
-    logger << "Connecting no indegree time: " << timer.elapsed() << "s" << std::endl;
+    // timer.start();
+    // connect_no_indegree(graph_[0]);
+    // timer.end();
+    // logger << "Connecting no indegree time: " << timer.elapsed() << "s" << std::endl;
 
     timer.start();
     prune(graph_[0]);
@@ -168,6 +204,9 @@ MGraph::Refinement() {
     add_reverse_edge(graph_[0]);
     timer.end();
     logger << "Adding reverse edge time: " << timer.elapsed() << "s" << std::endl;
+
+    logger << "Refinement finished" << std::endl;
+    print_memory_usage();
 }
 
 void
@@ -299,12 +338,13 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
     Timer timer;
     timer.start();
 
-    if (start_iter_ == 0) {
+    if (cur_phase_ == "1") {
         logger << "Start merging index from scratch." << std::endl;
         CrossQuery(indexes);
     } else {
         logger << "Start merging index from iteration " << start_iter_ << std::endl;
     }
+    print_memory_usage();
 
     logger << "Max Index Size " << max_index_size_ << std::endl;
     logger << "Offsets:";
@@ -313,6 +353,7 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
     }
     logger << std::endl;
     Refinement();
+    print_memory_usage();
 
     ReconstructHGraph();
 

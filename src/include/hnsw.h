@@ -40,8 +40,6 @@ protected:
 
     std::default_random_engine random_engine_;
 
-    std::mutex graph_lock_;
-
     virtual void
     addPoint(unsigned index);
 
@@ -76,11 +74,10 @@ public:
     HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
 
     HNSW(DatasetPtr& dataset,
-         HGraph& graph,
+         const std::string& index_file,
          bool partial = false,
          int max_neighbors = 32,
          int ef_construction = 200);
-
     ~HNSW() override = default;
 
     void
@@ -88,6 +85,9 @@ public:
 
     void
     set_ef_construction(int ef_construction);
+
+    void
+    set_cur_size(uint64_t cur_size);
 
     void
     build() override;

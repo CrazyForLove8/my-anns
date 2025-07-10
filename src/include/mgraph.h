@@ -28,8 +28,6 @@ private:
 
     std::vector<uint32_t> levels_;
 
-    std::mutex graph_lock_;
-
     void
     CrossQuery(std::vector<IndexPtr>& indexes) override;
 
@@ -50,6 +48,12 @@ public:
     explicit MGraph(unsigned int max_degree, unsigned int ef_construction, float sample_rate = 0.3);
 
     explicit MGraph(DatasetPtr& dataset,
+                    unsigned int max_degree,
+                    unsigned int ef_construction,
+                    float sample_rate = 0.3);
+
+    explicit MGraph(DatasetPtr& dataset,
+                    std::string& index_path,
                     unsigned int max_degree,
                     unsigned int ef_construction,
                     float sample_rate = 0.3);

@@ -21,11 +21,15 @@ protected:
 
     float sample_rate_;
 
-    std::vector<size_t> offsets_;
+    std::vector<uint64_t> offsets_;
 
-    size_t start_iter_{0};
+    uint64_t start_id_{0};
 
-    size_t max_index_size_{0};
+    uint64_t start_iter_{0};
+
+    uint64_t max_index_size_{0};
+
+    std::string cur_phase_{"1"};
 
     //TODO we can support index_name_ for each index
     std::string serial_;

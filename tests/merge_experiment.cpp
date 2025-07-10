@@ -354,7 +354,6 @@ exp_multiple(DatasetPtr& dataset) {
     Log::redirect("mul_" + dataset->getName() + "_ours");
     std::cout << "Current Time: " << Log::getTimestamp() << "\n";
 
-    omp_set_num_threads(20);
     auto split = {3, 4, 5, 6, 7};
     int max_degree;
     if (dataset->getName() == "crawl" || dataset->getName() == "gist" ||
@@ -473,12 +472,12 @@ mergeExp10(DatasetPtr& dataset) {
 int
 main() {
     Log::setVerbose(true);
-
+    print_memory_usage_linux();
     auto dataset = Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
                                         "/root/mount/dataset/internet_search/internet_search_test.fbin",
                                         "/root/mount/dataset/internet_search/internet_search_neighbors.fbin", DISTANCE::L2);
-
-    mergeExp6_3(dataset);
+    print_memory_usage_linux();
+    // mergeExp6_3(dataset);
 
 #if ALARM_FINISHED
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");

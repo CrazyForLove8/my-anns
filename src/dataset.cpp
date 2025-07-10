@@ -1,5 +1,7 @@
 #include "dataset.h"
 
+using namespace graph;
+
 std::unordered_set<std::string> angular_datasets = {"deep", "glove", "crawl"};
 
 std::shared_ptr<Dataset>

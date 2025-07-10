@@ -10,6 +10,27 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <random>
+
+#include "logger.h"
+
+std::string
+filename_separator();
+
+std::string
+get_path(std::string filename);
+
+std::string
+append(const std::string& filename, const std::string& suffix);
+
+std::string
+get_suffix(const std::string& filename, int n = -1);
+
+void
+check_and_remove(const std::string& filename);
+
+void
+check_prefix_and_remove(const std::string& file_path_with_prefix);
 
 class CsvLogger {
 public:

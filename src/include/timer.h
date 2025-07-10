@@ -13,6 +13,7 @@ namespace graph {
 class Timer {
 private:
     std::chrono::time_point<std::chrono::steady_clock> _start, _end;
+    double _elapsed;
     bool started;
 
 public:

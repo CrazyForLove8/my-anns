@@ -56,6 +56,14 @@ Index::build() {
 }
 
 void
+Index::setSaveHelper(const uint8_t save_frequency, const std::string& save_path)  {
+    save_helper_.save_frequency = save_frequency;
+    save_helper_.save_path = save_path;
+
+    save_helper_.save_per_count = oracle_->size() / save_frequency;
+}
+
+void
 Index::reset(DatasetPtr& dataset) {
     dataset_ = dataset;
     oracle_ = dataset->getOracle();
@@ -103,6 +111,7 @@ Index::print_info() const {
 #pragma omp single
         { logger << "Number of threads: " << omp_get_num_threads() << std::endl; }
     }
+    print_memory_usage();
 }
 
 FlattenGraph&
