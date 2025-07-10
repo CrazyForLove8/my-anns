@@ -323,7 +323,7 @@ void
 mergeExp6_3(DatasetPtr& dataset) {
     Log::redirect("6.3_" + dataset->getName() + "_repair_no_in_degree");
     std::cout << "Exp6.3: Repair no in-degree\n";
-    //    std::cout << "Baseline" << std::endl;
+    std::cout << "Baseline" << std::endl;
     std::cout << "Current Time: " << Log::getTimestamp() << "\n";
     std::cout << "Dataset name: " << dataset->getName() << " size: " << dataset->getSize()
               << std::endl;
@@ -332,7 +332,6 @@ mergeExp6_3(DatasetPtr& dataset) {
     std::cout << "Number of splits: " << num_splits << std::endl;
     auto datasets = dataset->subsets(num_splits);
 
-    omp_set_num_threads(20);
     std::vector<IndexPtr> vec(datasets.size());
     for (size_t i = 0; i < datasets.size(); i++) {
         vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], 32, 200);
@@ -469,15 +468,17 @@ mergeExp10(DatasetPtr& dataset) {
     }
 }
 
-#define ALARM_FINISHED 1
+#define ALARM_FINISHED 0
 
 int
 main() {
     Log::setVerbose(true);
 
-    auto dataset = Dataset::getInstance("sift", "1m");
+    auto dataset = Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
+                                        "/root/mount/dataset/internet_search/internet_search_test.fbin",
+                                        "/root/mount/dataset/internet_search/internet_search_neighbors.fbin", DISTANCE::L2);
 
-    exp_multiple(dataset);
+    mergeExp6_3(dataset);
 
 #if ALARM_FINISHED
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");

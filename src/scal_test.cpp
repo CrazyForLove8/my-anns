@@ -218,13 +218,13 @@ main(int argc, char* argv[]) {
     std::cout << "------------------------------------" << std::endl;
 
     std::cout << "Step 2, use HNSW to insert smaller datasets into larger index." << std::endl;
-    hnsw_add(dataset,
-             hnsw_indexes[0],
-             split_number,
-             output_path,
-             num_threads,
-             max_neighbors,
-             ef_construction);
+    // hnsw_add(dataset,
+    //          hnsw_indexes[0],
+    //          split_number,
+    //          output_path,
+    //          num_threads,
+    //          max_neighbors,
+    //          ef_construction);
     std::cout << "------------------------------------" << std::endl;
 
     std::cout << "Step 3, merge sub-indexes using our method." << std::endl;

@@ -446,7 +446,7 @@ FGIM::connect_no_indegree(Graph& graph) {
 }
 
 bool
-FGIM::are_in_same_index(size_t id1, size_t id2) const {
+FGIM::are_in_same_index(const size_t id1, const size_t id2) const {
     if (offsets_.empty() || id1 >= offsets_.back() || id2 >= offsets_.back()) {
         logger << "Error: Vector index out of bounds or empty offsets." << std::endl;
         return false;

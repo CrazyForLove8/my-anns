@@ -386,9 +386,13 @@ hnsw::HNSW::partial_build(uint64_t num) {
         cur_size_ += num;
     }
     if (cur_size_ == oracle_->size()) {
+        logger << "Partial build completed, total size: " << cur_size_ << std::endl;
         flatten_graph_ = FlattenHGraph(graph_);
         built_ = true;
+        logger << "Index built successfully." << std::endl;
     } else {
+        logger << "Partial build completed, total size: " << cur_size_
+               << ", but not all points are added yet." << std::endl;
         built_ = false;
     }
 }
@@ -411,6 +415,7 @@ hnsw::HNSW::build() {
 
     flatten_graph_ = FlattenHGraph(graph_);
     built_ = true;
+    logger << "Index built successfully." << std::endl;
 }
 
 void
@@ -444,7 +449,7 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = cur_size; i < total; ++i) {
-        if (i % 10000 == 0) {
+        if (i % 100000 == 0) {
             logger << "Adding " << i << " / " << total << std::endl;
         }
         addPoint(i);

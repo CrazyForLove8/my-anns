@@ -100,7 +100,15 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
     } else {
         search_Ls = {search_L};
     }
+
     size_t qsize = dataset->getQuery().size();
+    logger << "Running recall evaluation with K = " << K << " and runs = " << runs
+           << " for ef_search: ";
+    for (auto L : search_Ls) {
+        logger << L << " ";
+    }
+    logger << std::endl;
+    logger << "Total queries: " << qsize << std::endl;
 
     for (auto L : search_Ls) {
         if (std::holds_alternative<IndexPtr>(index)) {
