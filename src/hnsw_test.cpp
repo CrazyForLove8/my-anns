@@ -13,7 +13,7 @@ testBuild() {
     index->build();
     recall(index, dataset);
 
-    //    saveHGraph(index->extractHGraph(), "hnsw_" + dataset->getName());
+    //    saveHGraph(index->extract_hgraph(), "hnsw_" + dataset->getName());
 }
 
 void
@@ -40,7 +40,7 @@ hnsw_exp_observation() {
     auto index = std::make_shared<HNSW>(dataset, 20, 200);
     index->build();
 
-    auto& ori_graph = index->extractHGraph()[0];
+    auto& ori_graph = index->extract_hgraph()[0];
 
     auto datasets = std::vector<DatasetPtr>();
     dataset->split(datasets, 2);
@@ -48,11 +48,11 @@ hnsw_exp_observation() {
 
     auto idx_1 = std::make_shared<HNSW>(datasets[0], 20, 200);
     idx_1->build();
-    auto& graph_1 = idx_1->extractHGraph()[0];
+    auto& graph_1 = idx_1->extract_hgraph()[0];
 
     auto idx_2 = std::make_shared<HNSW>(datasets[1], 20, 200);
     idx_2->build();
-    auto& graph_2 = idx_2->extractHGraph()[0];
+    auto& graph_2 = idx_2->extract_hgraph()[0];
 
     double hits = 0;
     double new_local = 0, new_cross = 0;
@@ -131,7 +131,7 @@ hnsw_exp_extend_observation() {
 
     auto total_size = dataset->getOracle()->size();
 
-    auto& ori_graph = index->extractHGraph()[0];
+    auto& ori_graph = index->extract_hgraph()[0];
 
     size_t idx_size = 5;
     std::cout << "Number of splits: " << idx_size << std::endl;
@@ -148,7 +148,7 @@ hnsw_exp_extend_observation() {
         auto idx = std::make_shared<HNSW>(datasets[i], 20, 200);
         idx->build();
         indexes.emplace_back(idx);
-        graphs.emplace_back(idx->extractHGraph()[0]);
+        graphs.emplace_back(idx->extract_hgraph()[0]);
         offsets.emplace_back(datasets[i]->getOracle()->size() + offsets[i]);
     }
 
@@ -211,7 +211,7 @@ test_save_and_load() {
     logger << "HNSW index built successfully" << std::endl;
     recall(index, dataset);
     logger << "Saving HNSW index to disk" << std::endl;
-    saveHGraph(index->extractHGraph(), "/root/mount/my-anns/internet/hnsw_internet_search");
+    saveHGraph(index->extract_hgraph(), "/root/mount/my-anns/internet/hnsw_internet_search");
     logger << "HNSW index saved successfully" << std::endl;
 
     HGraph hgraph;
@@ -243,10 +243,34 @@ test_partial_build() {
     recall(index, dataset);
 }
 
+void
+test_enable_save_help() {
+    auto dataset = Dataset::getInstance("sift", "100k");
+    auto datasets = dataset->subsets(2);
+
+    auto index1 = std::make_shared<hnsw::HNSW>(datasets[0], 32, 200);
+    index1->build();
+
+    auto path = saveHGraph(index1->extract_hgraph(), "index1.bin", index1->extract_params());
+    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, path);
+    hnsw->set_save_helper({3, "hnsw_checkpoint.bin"});
+    hnsw->partial_build();
+}
+
+void
+test_load_checkpoint() {
+    auto dataset = Dataset::getInstance("sift", "100k");
+
+    auto path = "./graph_output/hnsw_checkpoint.bin";
+    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, path);
+    hnsw->set_save_helper({4, "hnsw_checkpoint.bin"});
+    hnsw->partial_build();
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    test_partial_build();
+    test_load_checkpoint();
     return 0;
 }

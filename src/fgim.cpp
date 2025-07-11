@@ -68,7 +68,7 @@ FGIM::update_neighbors(Graph& graph) {
     // FIXME Segmentation Fault???
     size_t it = start_iter_;
     unsigned samples = sample_rate_ * max_base_degree_;
-    while (++it && it <= ITER_MAX) {
+    do {
         int cnt = 0;
 #pragma omp parallel
         {
@@ -161,24 +161,21 @@ FGIM::update_neighbors(Graph& graph) {
         logger << "Iteration " << it << " with " << cnt << " new edges" << std::endl;
         unsigned convergence = std::lround(THRESHOLD * static_cast<float>(graph.size()) *
                                            static_cast<float>(max_base_degree_));
-        //        if (it % 5 == 0) {
-        //            saveGraph(graph,
-        //                      "fgim_" + dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_) +
-        //                          "_iter_" + std::to_string(it) + ".bin");
-        //        }
         connect_no_indegree(graph);
         if (cnt <= convergence) {
             break;
         }
 
         if (save_helper_.is_enabled() && it % save_helper_.save_frequency == 0) {
-            auto path = append(save_helper_.save_path, cur_phase_);
-            logger << "Saving temporary index to " << path << std::endl;
-            check_and_remove(path);
-            saveGraph(graph, path);
-            logger << "Saved index at iteration " << it << " to " << path << std::endl;
+            logger << "Saving temporary index to " << save_helper_.save_path << std::endl;
+            auto params = extract_params();
+            params["phase"] = cur_phase_;
+            params["iteration"] = it;
+            saveGraph(graph, save_helper_.save_path, params);
+            logger << "Saved index at iteration " << it << " to " << save_helper_.save_path
+                   << std::endl;
         }
-    }
+    } while (++it && it <= ITER_MAX);
 }
 
 // No streamlined
@@ -485,9 +482,9 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
         auto hnsw_index = std::dynamic_pointer_cast<hnsw::HNSW>(index);
         if (hnsw_index == nullptr) {
             isHGraph = false;
-            graphs.emplace_back(index->extractGraph());
+            graphs.emplace_back(index->extract_graph());
         } else {
-            hgraphs.emplace_back(hnsw_index->extractHGraph());
+            hgraphs.emplace_back(hnsw_index->extract_hgraph());
         }
     }
 
@@ -559,6 +556,7 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
 
 void
 FGIM::Refinement() {
+    cur_phase_ = "2";
     Timer timer;
 
     timer.start();
@@ -583,11 +581,11 @@ FGIM::Refinement() {
 }
 
 void
-FGIM::Combine(std::vector<IndexPtr>& indexes) {
+FGIM::combine(std::vector<IndexPtr>& indexes) {
     if (dataset_ == nullptr) {
         std::vector<DatasetPtr> datasets;
         for (auto& index : indexes) {
-            datasets.emplace_back(index->extractDataset());
+            datasets.emplace_back(index->extract_dataset());
         }
         dataset_ = Dataset::aggregate(datasets);
         oracle_ = dataset_->getOracle();
@@ -637,4 +635,13 @@ FGIM::print_info() const {
     logger << "Max degree: " << max_degree_ << std::endl;
     logger << "Max base degree: " << max_base_degree_ << std::endl;
     logger << "Sample rate: " << sample_rate_ << std::endl;
+}
+
+ParamMap
+FGIM::extract_params() {
+    auto params = Index::extract_params();
+    params["index_type"] = "FGIM";
+    params["max_degree"] = max_degree_;
+    params["sample_rate"] = sample_rate_;
+    return params;
 }

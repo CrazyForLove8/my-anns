@@ -30,7 +30,7 @@ testSaveGraph(DatasetPtr& dataset) {
     auto nnd = std::make_shared<nndescent::NNDescent>(dataset, 32);
     nnd->build();
 
-    auto& graph = nnd->extractGraph();
+    auto& graph = nnd->extract_graph();
     saveGraph(graph, "nnd_" + dataset->getName());
 }
 

@@ -95,7 +95,7 @@ nsg::NSG::build_internal() {
     {
         nndescent::NNDescent nnd(dataset_, K_);
         nnd.build();
-        graph_ = std::move(nnd.extractGraph());
+        graph_ = std::move(nnd.extract_graph());
     }
 
     {

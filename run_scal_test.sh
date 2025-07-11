@@ -9,11 +9,11 @@ DATASET_GROUNDTRUTH="/root/mount/dataset/internet_search/internet_search_neighbo
 # l2, cosine
 METRIC="l2"
 # 日志输出目录、构建好的索引输出目录
-OUTPUT_PATH="/root/graph_merge/output/"
+OUTPUT_PATH="/root/mount/my-anns/output/internet_search/"
 # 把数据集平分为多少个子集
 SPLIT_NUM=2
 # 运行线程数
-THREAD_NUM=256
+THREAD_NUM=200
 # 我们的方法的参数
 K=20
 # HNSW & Vamana 共享的参数

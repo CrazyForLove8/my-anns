@@ -36,7 +36,7 @@ test_taumng(DatasetPtr& dataset) {
 
     nndescent.build();
 
-    auto graph = nndescent.extractGraph();
+    auto graph = nndescent.extract_graph();
 
     taumng::TauMNG taumng(dataset, graph, 10, 80, 100);
 

@@ -33,37 +33,57 @@ MGraph::MGraph(DatasetPtr& dataset,
       reverse_(1 / log(1.0 * max_degree)) {
 }
 
-MGraph::MGraph(DatasetPtr& dataset,
-               std::string& index_path,
-               unsigned int max_degree,
-               unsigned int ef_construction,
-               float sample_rate) :
-      FGIM(dataset, max_degree, sample_rate, false),
-      ef_construction_(ef_construction),
+MGraph::MGraph(DatasetPtr& dataset, const std::string& index_path)
+    : FGIM(dataset, 20, 0.3, false),
       random_engine_(2024),
       enter_point_(0),
       max_level_(0),
-      cur_max_level_(0),
-      reverse_(1 / log(1.0 * max_degree)) {
-
-    loadGraph(graph_[0], index_path, dataset->getOracle());
-    cur_phase_ = get_suffix(index_path, 1);
-    if (cur_phase_ == "1") {
-        auto tmp = get_suffix(index_path);
-        tmp.pop_back();
-        start_id_ = std::stoull(tmp);
+      cur_max_level_(0) {
+    graph_.resize(1);
+    auto params = loadGraph(graph_[0], index_path, dataset->getOracle());
+    if (params.find("phase") != params.end()) {
+        cur_phase_ = std::get<std::string>(params["phase"]);
+        if (cur_phase_ == "1") {
+            if (params.find("save_point") != params.end()) {
+                start_id_ = std::get<uint64_t>(params["save_point"]);
+                save_helper_.last_save_point = start_id_;
+            }
+        } else if (cur_phase_ == "2") {
+            start_id_ = oracle_->size();
+        } else {
+            throw std::runtime_error("Unsupported phase: " + cur_phase_);
+        }
+        logger << "Start from Phase: " << cur_phase_ << std::endl;
+        logger << "Start ID: " << start_id_ << std::endl;
+    }
+    if (params.find("max_degree") != params.end()) {
+        max_degree_ = std::get<uint64_t>(params["max_degree"]);
+        max_base_degree_ = max_degree_ * 2;
+        reverse_ = 1 / log(1.0 * max_degree_);
+    }
+    if (params.find("sample_rate") != params.end()) {
+        sample_rate_ = std::get<double_t>(params["sample_rate"]);
+    }
+    if (params.find("ef_construction") != params.end()) {
+        ef_construction_ = std::get<uint64_t>(params["ef_construction"]);
+    }
+    if (params.find("built") != params.end()) {
+        built_ = std::get<uint64_t>(params["built"]);
     }
 
+    if (built_) {
+        flatten_graph_ = FlattenHGraph(graph_);
+    }
 }
 
 Graph&
-MGraph::extractGraph() {
+MGraph::extract_graph() {
     throw std::runtime_error(
-        "MGraph does not support extractGraph, please use extractHGraph instead");
+        "MGraph does not support extract_graph, please use extract_hgraph instead");
 }
 
 HGraph&
-MGraph::extractHGraph() {
+MGraph::extract_hgraph() {
     return graph_;
 }
 
@@ -72,27 +92,27 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     Timer timer;
     timer.start();
 
-    if (start_id_ == 0) {
-        std::vector<std::reference_wrapper<Graph> > graphs;
-        std::vector<std::reference_wrapper<HGraph> > hgraphs;
-        bool isHGraph = true;
-        for (auto& index : indexes) {
-            auto hnsw_index = std::dynamic_pointer_cast<hnsw::HNSW>(index);
-            if (hnsw_index == nullptr) {
-                isHGraph = false;
-                graphs.emplace_back(index->extractGraph());
-            } else {
-                hgraphs.emplace_back(hnsw_index->extractHGraph());
-            }
+    std::vector<std::reference_wrapper<Graph> > graphs;
+    std::vector<std::reference_wrapper<HGraph> > hgraphs;
+    bool isHGraph = true;
+    for (auto& index : indexes) {
+        auto hnsw_index = std::dynamic_pointer_cast<hnsw::HNSW>(index);
+        if (hnsw_index == nullptr) {
+            isHGraph = false;
+            graphs.emplace_back(index->extract_graph());
+        } else {
+            hgraphs.emplace_back(hnsw_index->extract_hgraph());
         }
+    }
 
-        size_t offset = 0;
-        offsets_.clear();
-        if (isHGraph) {
-            for (auto& g : hgraphs) {
-                auto& graph_ref = g.get();
-                auto graph_size = graph_ref[0].size();
-    #pragma omp parallel for schedule(dynamic)
+    size_t offset = 0;
+    offsets_.clear();
+    if (isHGraph) {
+        for (auto& g : hgraphs) {
+            auto& graph_ref = g.get();
+            auto graph_size = graph_ref[0].size();
+            if (start_id_ == 0) {
+#pragma omp parallel for schedule(dynamic)
                 for (size_t i = 0; i < graph_size; ++i) {
                     auto& neighbors = graph_ref[0][i].candidates_;
                     for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
@@ -103,15 +123,17 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
                     std::make_heap(graph_[0][i + offset].candidates_.begin(),
                                    graph_[0][i + offset].candidates_.end());
                 }
-                offset += graph_size;
-                max_index_size_ = std::max(max_index_size_, graph_size);
-                offsets_.emplace_back(offset);
             }
-        } else {
-            for (auto& g : graphs) {
-                auto& graph_ref = g.get();
-                auto graph_size = graph_ref.size();
-    #pragma omp parallel for schedule(dynamic)
+            offset += graph_size;
+            max_index_size_ = std::max(max_index_size_, graph_size);
+            offsets_.emplace_back(offset);
+        }
+    } else {
+        for (auto& g : graphs) {
+            auto& graph_ref = g.get();
+            auto graph_size = graph_ref.size();
+            if (start_id_ == 0) {
+#pragma omp parallel for schedule(dynamic)
                 for (size_t i = 0; i < graph_size; ++i) {
                     auto& neighbors = graph_ref[i].candidates_;
                     for (size_t j = 0; j < neighbors.size() && j < max_base_degree_; ++j) {
@@ -122,12 +144,13 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
                     std::make_heap(graph_[0][i + offset].candidates_.begin(),
                                    graph_[0][i + offset].candidates_.end());
                 }
-                offset += graph_size;
-                max_index_size_ = std::max(max_index_size_, graph_size);
-                offsets_.emplace_back(offset);
             }
+            offset += graph_size;
+            max_index_size_ = std::max(max_index_size_, graph_size);
+            offsets_.emplace_back(offset);
         }
     }
+
     //    logger << "Performing Random Sampling" << std::endl;
     //    std::mt19937_64 rng(2024);
     //#pragma omp parallel for schedule(dynamic)
@@ -147,7 +170,7 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     unsigned L = max_degree_ / (indexes.size() - 1);
     logger << "ef_construction: " << L << std::endl;
 #pragma omp parallel for schedule(dynamic)
-    for (int u = start_id_; u < oracle_->size(); ++u) {
+    for (auto u = start_id_; u < oracle_->size(); ++u) {
         auto cur_graph_idx =
             std::upper_bound(offsets_.begin(), offsets_.end(), u) - offsets_.begin();
         auto data = (*oracle_)[u];
@@ -164,12 +187,14 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
             }
         }
 
-        if (save_helper_.is_enabled() && u % save_helper_.get_interval() == 0) {
-            auto path = append(save_helper_.save_path, filename_separator() + std::to_string(u));
-            path = append(path, cur_phase_);
-            logger << "Saving temporary index to " << path << std::endl;
-            check_and_remove(path);
-            saveGraph(graph_[0], path);
+        if (save_helper_.should_save(u)) {
+            logger << "Saving temporary index at point " << u << std::endl;
+            logger << "Last save point: " << save_helper_.last_save_point << std::endl;
+            logger << "Saving temporary index to " << save_helper_.save_path << std::endl;
+            auto params = extract_params();
+            params["phase"] = cur_phase_;
+            params["save_point"] = u;
+            saveGraph(graph_[0], save_helper_.save_path, params);
             logger << "Saved index at point " << u << std::endl;
         }
     }
@@ -177,7 +202,6 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     timer.end();
     logger << "Cross query time: " << timer.elapsed() << "s" << std::endl;
     logger << "Cross query finished" << std::endl;
-    print_memory_usage();
 }
 
 void
@@ -204,9 +228,7 @@ MGraph::Refinement() {
     add_reverse_edge(graph_[0]);
     timer.end();
     logger << "Adding reverse edge time: " << timer.elapsed() << "s" << std::endl;
-
     logger << "Refinement finished" << std::endl;
-    print_memory_usage();
 }
 
 void
@@ -297,12 +319,12 @@ MGraph::ReconstructHGraph() {
 }
 
 void
-MGraph::Combine(std::vector<IndexPtr>& indexes) {
+MGraph::combine(std::vector<IndexPtr>& indexes) {
     if (dataset_ == nullptr) {
         logger << "No dataset found, merging data from indexes" << std::endl;
         std::vector<DatasetPtr> datasets;
         for (auto& index : indexes) {
-            datasets.emplace_back(index->extractDataset());
+            datasets.emplace_back(index->extract_dataset());
         }
 
         dataset_ = Dataset::aggregate(datasets);
@@ -333,17 +355,11 @@ MGraph::Combine(std::vector<IndexPtr>& indexes) {
             graph_[level][i].candidates_.reserve(max_degree_);
         }
     }
-    //    load_latest(graph_[0]);
 
     Timer timer;
     timer.start();
 
-    if (cur_phase_ == "1") {
-        logger << "Start merging index from scratch." << std::endl;
-        CrossQuery(indexes);
-    } else {
-        logger << "Start merging index from iteration " << start_iter_ << std::endl;
-    }
+    CrossQuery(indexes);
     print_memory_usage();
 
     logger << "Max Index Size " << max_index_size_ << std::endl;
@@ -381,4 +397,26 @@ MGraph::print_info() const {
     FGIM::print_info();
     logger << "MGraph Info:" << std::endl;
     logger << "Ef Construction: " << ef_construction_ << std::endl;
+}
+
+ParamMap
+MGraph::extract_params() {
+    auto params = FGIM::extract_params();
+    params["index_type"] = "MGraph";
+    params["ef_construction"] = ef_construction_;
+    return params;
+}
+void
+MGraph::load_params(const ParamMap& params) {
+    if (params.find("ef_construction") != params.end()) {
+        ef_construction_ = std::get<uint64_t>(params.at("ef_construction"));
+    }
+    if (params.find("max_degree") != params.end()) {
+        max_degree_ = std::get<uint64_t>(params.at("max_degree"));
+        max_base_degree_ = max_degree_ * 2;
+        reverse_ = 1 / log(1.0 * max_degree_);
+    }
+    if (params.find("sample_rate") != params.end()) {
+        sample_rate_ = std::get<double_t>(params.at("sample_rate"));
+    }
 }

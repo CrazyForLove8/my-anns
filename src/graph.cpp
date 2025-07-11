@@ -460,7 +460,7 @@ graph::track_search(IndexOracle<float>* oracle,
 }
 
 std::string
-graph::saveGraph(Graph& graph, const std::string& filename) {
+graph::saveGraph(Graph& graph, const std::string& filename, const ParamMap& params) {
     if (graph.empty()) {
         return "";
     }
@@ -483,11 +483,14 @@ graph::saveGraph(Graph& graph, const std::string& filename) {
             file.write(reinterpret_cast<const char*>(&neighbor.id), sizeof(neighbor.id));
         }
     }
+
+    ParamsHelper::write(params, file);
     file.close();
+
     return path;
 }
 
-void
+ParamMap
 graph::loadGraph(Graph& graph, const std::string& index_path, const OraclePtr& oracle) {
     std::ifstream file(index_path, std::ios::in | std::ios::binary);
 
@@ -513,19 +516,26 @@ graph::loadGraph(Graph& graph, const std::string& index_path, const OraclePtr& o
                       sizeof(graph[node_id].candidates_[j].id));
         }
     }
+
+    ParamMap params;
+    ParamsHelper::read(params, file);
     file.close();
+
+    logger << "Graph loaded successfully, size: " << graph_size << std::endl;
 
     if (oracle != nullptr) {
         for (size_t i = 0; i < graph.size(); ++i) {
             for (auto& c : graph[i].candidates_) {
                 c.distance = (*oracle)(i, c.id);
+                c.flag = true;
             }
         }
     }
+    return params;
 }
 
 std::string
-graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
+graph::saveHGraph(HGraph& hgraph, const std::string& filename, const ParamMap& params) {
     if (hgraph.empty()) {
         logger << "HGraph is empty, nothing to save." << std::endl;
         return "";
@@ -546,30 +556,39 @@ graph::saveHGraph(HGraph& hgraph, const std::string& filename) {
         }
     }
 
-    int64_t graph_size = hgraph[0].size();
-    int64_t max_level = hgraph.size() - 1;
+    uint64_t graph_size = hgraph[0].size();
+    // We can save less than the full graph size if specified in params
+    auto it = params.find("save_point");
+    if (it != params.end()) {
+        graph_size = std::get<uint64_t>(it->second);
+    }
+
+    uint64_t max_level = hgraph.size() - 1;
     logger << "Saving HGraph to " << full_filepath << std::endl;
     logger << "Graph size: " << graph_size << ", Max level: " << max_level << std::endl;
     file.write(reinterpret_cast<const char*>(&graph_size), sizeof(graph_size));
     file.write(reinterpret_cast<const char*>(&max_level), sizeof(max_level));
-    for (int64_t i = 0; i < graph_size; ++i) {
+    for (uint64_t i = 0; i < graph_size; ++i) {
         std::lock_guard<std::mutex> guard(hgraph[0][i].lock_);
         file.write(reinterpret_cast<const char*>(&i), sizeof(i));
         int level = levels[i];
         file.write(reinterpret_cast<const char*>(&level), sizeof(level));
         for (int j = 0; j <= level; ++j) {
-            int64_t num_candidates = hgraph[j][i].candidates_.size();
+            uint64_t num_candidates = hgraph[j][i].candidates_.size();
             file.write(reinterpret_cast<const char*>(&num_candidates), sizeof(num_candidates));
             for (const auto& neighbor : hgraph[j][i].candidates_) {
                 file.write(reinterpret_cast<const char*>(&neighbor.id), sizeof(neighbor.id));
             }
         }
     }
+
+    ParamsHelper::write(params, file);
     file.close();
+
     return full_filepath;
 }
 
-void
+ParamMap
 graph::loadHGraph(HGraph& hgraph, const std::string& index_path, const OraclePtr& oracle) {
     std::ifstream file(index_path, std::ios::in | std::ios::binary);
 
@@ -577,7 +596,7 @@ graph::loadHGraph(HGraph& hgraph, const std::string& index_path, const OraclePtr
         throw std::runtime_error("Cannot open the file for reading: " + index_path);
     }
 
-    int64_t graph_size, max_level;
+    uint64_t graph_size, max_level;
     file.read(reinterpret_cast<char*>(&graph_size), sizeof(graph_size));
     file.read(reinterpret_cast<char*>(&max_level), sizeof(max_level));
 
@@ -589,12 +608,12 @@ graph::loadHGraph(HGraph& hgraph, const std::string& index_path, const OraclePtr
     logger << "Loading HGraph from " << index_path << std::endl;
     logger << "Graph size: " << graph_size << ", Max level: " << max_level << std::endl;
     for (int i = 0; i < graph_size; ++i) {
-        int64_t node_id;
+        uint64_t node_id;
         file.read(reinterpret_cast<char*>(&node_id), sizeof(node_id));
         int level;
         file.read(reinterpret_cast<char*>(&level), sizeof(level));
         for (int j = 0; j <= level; ++j) {
-            int64_t num_neighbors;
+            uint64_t num_neighbors;
             file.read(reinterpret_cast<char*>(&num_neighbors), sizeof(num_neighbors));
             hgraph[j][node_id].candidates_.resize(num_neighbors);
             for (int k = 0; k < num_neighbors; ++k) {
@@ -603,17 +622,33 @@ graph::loadHGraph(HGraph& hgraph, const std::string& index_path, const OraclePtr
             }
         }
     }
+
+    ParamMap params;
+    ParamsHelper::read(params, file);
     file.close();
 
     if (oracle != nullptr) {
         for (int i = 0; i < static_cast<int>(hgraph.size()); ++i) {
             for (int j = 0; j < static_cast<int>(hgraph[i].size()); ++j) {
-                for (auto& c : hgraph[i][j].candidates_) {
+                auto& candidates = hgraph[i][j].candidates_;
+                candidates.erase(std::remove_if(candidates.begin(),
+                                                candidates.end(),
+                                                [&](const Neighbor& n) {
+                                                    return n.id < 0 || n.id >= graph_size;
+                                                }),
+                                 candidates.end());
+
+                for (auto& c : candidates) {
                     c.distance = (*oracle)(j, c.id);
+                    c.flag = true;
                 }
             }
         }
     }
+
+    logger << "HGraph loaded successfully, size: " << graph_size << ", max level: " << max_level
+           << std::endl;
+    return params;
 }
 
 int

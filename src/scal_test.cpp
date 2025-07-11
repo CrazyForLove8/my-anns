@@ -49,12 +49,14 @@ build_sub_indexes(const DatasetPtr& dataset,
         if (index_type == 0) {
             auto index = std::make_shared<hnsw::HNSW>(data, max_neighbors, ef_construction);
             index->build();
-            output_files.emplace_back(saveHGraph(index->extractHGraph(), output_file));
+            output_files.emplace_back(
+                saveHGraph(index->extract_hgraph(), output_file, index->extract_params()));
         } else if (index_type == 1) {
             auto index =
                 std::make_shared<diskann::Vamana>(data, alpha, ef_construction, max_neighbors);
             index->build();
-            output_files.emplace_back(saveGraph(index->extractGraph(), output_file));
+            output_files.emplace_back(
+                saveGraph(index->extract_graph(), output_file, index->extract_params()));
         } else {
             throw std::invalid_argument("Unsupported index type");
         }
@@ -64,13 +66,12 @@ build_sub_indexes(const DatasetPtr& dataset,
 
 void
 hnsw_add(DatasetPtr& dataset,
-         std::string& index_file,
+         const std::string& index_file,
          const int split_number,
          const std::string& output_path,
          const int num_threads = 48,
          const int max_neighbors = 32,
-         const int ef_construction = 200,
-         const std::string& temp_index_file) {
+         const int ef_construction = 200) {
     std::string output_file = output_path + "/";
     output_file += dataset->getName() + "_" + std::to_string(split_number) + "_baseline_hnsw_add" +
                    "_" + std::to_string(max_neighbors) + "_" + std::to_string(ef_construction) +
@@ -80,17 +81,30 @@ hnsw_add(DatasetPtr& dataset,
         return;
     }
 
-    if (temp_index_file != "none") {
-        index_file = temp_index_file;
+    std::string checkpoint_file = output_path + "/";
+    checkpoint_file += dataset->getName() + "_baseline_hnsw_checkpoint" + "_" +
+                       std::to_string(max_neighbors) + "_" + std::to_string(ef_construction) +
+                       ".bin";
+    auto target_index = index_file;
+    if (check_if_exist(checkpoint_file)) {
+        std::cout << "Checkpoint file exists, will resume from it." << std::endl;
+        target_index = checkpoint_file;
+    } else {
+        std::cout << "Checkpoint file does not exist, will start from scratch." << std::endl;
     }
 
-    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, index_file, true, max_neighbors, ef_construction);
+    auto hnsw = std::make_shared<hnsw::HNSW>(dataset, target_index);
+    ParamMap params;
+    params["max_neighbors"] = (uint64_t)max_neighbors;
+    params["ef_construction"] = (uint64_t)ef_construction;
+    hnsw->load_params(params);
+    hnsw->set_save_helper({5, checkpoint_file});
     omp_set_num_threads(num_threads);
     hnsw->partial_build();
 
-    recall(hnsw, dataset);
+    saveHGraph(hnsw->extract_hgraph(), output_file, hnsw->extract_params());
 
-    saveHGraph(hnsw->extractHGraph(), output_file);
+    recall(hnsw, dataset);
 }
 
 void
@@ -112,9 +126,9 @@ vamana_build(DatasetPtr& dataset,
     omp_set_num_threads(num_threads);
     vamana->build();
 
-    recall(vamana, dataset);
+    saveGraph(vamana->extract_graph(), output_file, vamana->extract_params());
 
-    saveGraph(vamana->extractGraph(), output_file);
+    recall(vamana, dataset);
 }
 
 void
@@ -124,8 +138,7 @@ mgraph_merge(DatasetPtr& dataset,
              const int num_threads = 48,
              const int index_type = 0,
              const int k = 20,
-             const int ef_construction = 200,
-             const std::string& temp_index_file = "none") {
+             const int ef_construction = 200) {
     std::string output_file = output_path + "/";
     output_file += dataset->getName() + "_" + std::to_string(subindex_files.size()) + "_ours" +
                    "_" + std::to_string(k) + "_index_type_" + std::to_string(index_type) + "_k_" +
@@ -149,27 +162,39 @@ mgraph_merge(DatasetPtr& dataset,
             throw std::invalid_argument("Unsupported index type");
         }
     }
-    // ?
-    MGraph mgraph(dataset, temp_index_file, k, ef_construction);
-    if (temp_index_file != "none") {
 
+    std::shared_ptr<MGraph> mgraph;
+    std::string checkpoint_file = output_path + "/";
+    checkpoint_file += dataset->getName() + "_ours_checkpoint" + "_" + std::to_string(index_type) +
+                       "_" + std::to_string(k) + ".bin";
+    if (check_if_exist(checkpoint_file)) {
+        std::cout << "Checkpoint file exists, will resume from it." << std::endl;
+        mgraph = std::make_shared<MGraph>(dataset, checkpoint_file);
+        ParamMap params;
+        params["max_degree"] = (uint64_t)k;
+        params["ef_construction"] = (uint64_t)ef_construction;
+        mgraph->load_params(params);
+    } else {
+        std::cout << "Checkpoint file does not exist, will start from scratch." << std::endl;
+        mgraph = std::make_shared<MGraph>(dataset, k, ef_construction);
     }
-    MGraph mgraph(dataset, k, ef_construction);
-    mgraph.set_serial(std::to_string(index_type));
+
+    mgraph->set_serial(std::to_string(index_type));
+    mgraph->set_save_helper({5, checkpoint_file});
     omp_set_num_threads(num_threads);
-    mgraph.Combine(vec);
+    mgraph->combine(vec);
+
+    saveHGraph(mgraph->extract_hgraph(), output_file, mgraph->extract_params());
 
     recall(mgraph, dataset);
-
-    saveHGraph(mgraph.extractHGraph(), output_file);
 }
 
 int
 main(int argc, char* argv[]) {
-    if (argc < 15) {
+    if (argc < 12) {
         std::cerr << "Usage: " << argv[0]
                   << " <base_file> <query_file> <gt_file> <metric> <output_path> "
-                     "<split_number> <num_threads> <k> <max_neighbors> <ef_construction> <alpha> <hnsw_index_path> <mgraph_path> <vamana_index_path>"
+                     "<split_number> <num_threads> <k> <max_neighbors> <ef_construction> <alpha>"
                   << std::endl;
         return 1;
     }
@@ -187,10 +212,6 @@ main(int argc, char* argv[]) {
     int max_neighbors = std::stoi(argv[9]);
     int ef_construction = std::stoi(argv[10]);
     float alpha = std::stof(argv[11]);
-
-    std::string hnsw_index_path = output_path + "/" + argv[12];
-    std::string mgraph_path = output_path + "/" + argv[13];
-    std::string vamana_index_path = output_path + "/" + argv[14];
 
     Log::setVerbose(true);
     Log::redirect(output_path);

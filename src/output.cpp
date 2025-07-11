@@ -24,23 +24,15 @@ get_path(std::string filename){
             std::filesystem::create_directories(parent_dir);
         }
 
-        if (std::filesystem::exists(p)) {
-            std::mt19937 rng(std::random_device{}());
-            std::string new_relative_filename = stem + "_" + std::to_string(rng()) + extension;
-            filename = (parent_dir / new_relative_filename).string();
-        } else {
-            filename = p.string();
-        }
+        check_and_remove(p.string());
+        filename = p.string();
         return filename;
     }
     if (!std::filesystem::exists(graph_output_dir)) {
         std::filesystem::create_directories(graph_output_dir);
     }
     std::filesystem::path pp(graph_output_dir + filename);
-    if (std::filesystem::exists(pp)) {
-        std::mt19937 rng(std::random_device{}());
-        filename = pp.stem().string() + "_" + std::to_string(rng()) + pp.extension().string();
-    }
+    check_and_remove(pp.string());
     return graph_output_dir + filename;
 }
 
@@ -66,6 +58,12 @@ get_suffix(const std::string& filename, const int n) {
     }
 
     return stem.substr(stem.size() - n);
+}
+
+bool
+check_if_exist(const std::string& filename) {
+    std::filesystem::path p(filename);
+    return std::filesystem::exists(p) && std::filesystem::is_regular_file(p);
 }
 
 void check_and_remove(const std::string& filename){
@@ -97,6 +95,71 @@ void check_prefix_and_remove(const std::string& file_path_with_prefix) {
                     logger << "Error removing file: " << entry.path() << " - " << e.what() << std::endl;
                 }
             }
+        }
+    }
+}
+
+void
+ParamsHelper::write(const ParamMap& map, std::ofstream& out) {
+    size_t count = map.size();
+    out.write(reinterpret_cast<const char*>(&count), sizeof(count));
+
+    for (const auto& [key, val] : map) {
+        size_t keyLen = key.size();
+        out.write(reinterpret_cast<const char*>(&keyLen), sizeof(keyLen));
+        out.write(key.data(), keyLen);
+
+        if (std::holds_alternative<uint64_t>(val)) {
+            uint8_t type = 0;
+            out.write(reinterpret_cast<const char*>(&type), sizeof(type));
+            auto i = std::get<uint64_t>(val);
+            out.write(reinterpret_cast<const char*>(&i), sizeof(i));
+        } else if (std::holds_alternative<double_t>(val)) {
+            uint8_t type = 1;
+            out.write(reinterpret_cast<const char*>(&type), sizeof(type));
+            auto f = std::get<double_t>(val);
+            out.write(reinterpret_cast<const char*>(&f), sizeof(f));
+        } else if (std::holds_alternative<std::string>(val)) {
+            uint8_t type = 2;
+            out.write(reinterpret_cast<const char*>(&type), sizeof(type));
+            auto b = std::get<std::string>(val);
+            size_t b_size = b.size();
+            out.write(reinterpret_cast<const char*>(&b_size), sizeof(b_size));
+            out.write(b.data(), b_size);
+        }
+    }
+
+    out.close();
+}
+
+void
+ParamsHelper::read(ParamMap& map, std::ifstream& in) {
+    size_t count;
+    in.read(reinterpret_cast<char*>(&count), sizeof(count));
+
+    for (size_t i = 0; i < count; ++i) {
+        size_t keyLen;
+        in.read(reinterpret_cast<char*>(&keyLen), sizeof(keyLen));
+        std::string key(keyLen, '\0');
+        in.read(&key[0], keyLen);
+
+        uint8_t type;
+        in.read(reinterpret_cast<char*>(&type), sizeof(type));
+
+        if (type == 0) {
+            uint64_t value;
+            in.read(reinterpret_cast<char*>(&value), sizeof(value));
+            map[key] = value;
+        } else if (type == 1) {
+            double_t value;
+            in.read(reinterpret_cast<char*>(&value), sizeof(value));
+            map[key] = value;
+        } else if (type == 2) {
+            size_t str_size;
+            in.read(reinterpret_cast<char*>(&str_size), sizeof(str_size));
+            std::string value(str_size, '\0');
+            in.read(&value[0], str_size);
+            map[key] = value;
         }
     }
 }

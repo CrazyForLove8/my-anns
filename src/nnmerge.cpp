@@ -8,8 +8,8 @@ nnmerge::NNMerge::NNMerge(
 void
 nnmerge::NNMerge::Combine(const IndexPtr& index1, const IndexPtr& index2) {
     print_info();
-    auto& graph1 = index1->extractGraph();
-    auto& graph2 = index2->extractGraph();
+    auto& graph1 = index1->extract_graph();
+    auto& graph2 = index2->extract_graph();
 
     graph_size_1 = graph1.size();
     graph_size_2 = graph2.size();
@@ -126,7 +126,7 @@ nnmerge::NNMerge::mergeGraph(Graph& G_v) {
 
 void
 nnmerge::NNMerge::build_internal() {
-    throw std::runtime_error("Not implemented, please use Combine instead");
+    throw std::runtime_error("Not implemented, please use combine instead");
 }
 
 int

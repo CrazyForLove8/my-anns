@@ -26,9 +26,8 @@ struct SaveHelper {
     std::string save_path;
 
     uint64_t save_per_count{0};
-    uint64_t last_save_id{0};
-
-    uint8_t save_phase{0};
+    uint64_t total_count{0};
+    uint64_t last_save_point{0};
 
     [[nodiscard]] bool is_enabled() const {
         return save_frequency > 0 && !save_path.empty();
@@ -36,6 +35,12 @@ struct SaveHelper {
 
     [[nodiscard]] uint64_t get_interval() const {
         return save_per_count > 0 ? save_per_count : ((save_frequency + 1) * 100000000);
+    }
+
+    [[nodiscard]] bool
+    should_save(uint64_t u) const {
+        return is_enabled() && u % get_interval() == 0 && u > last_save_point &&
+               u + save_per_count <= total_count;
     }
 };
 
@@ -72,7 +77,7 @@ public:
     virtual ~Index() = default;
 
     virtual void
-    setSaveHelper(uint8_t save_frequency, const std::string& save_path);
+    set_save_helper(const SaveHelper& saveHelper);
 
     virtual void
     reset(DatasetPtr& dataset);
@@ -88,13 +93,19 @@ public:
     add(DatasetPtr& dataset);
 
     virtual Graph&
-    extractGraph();
+    extract_graph();
 
     virtual FlattenGraph&
-    extractFlattenGraph();
+    extract_flatten_graph();
 
     virtual DatasetPtr&
-    extractDataset();
+    extract_dataset();
+
+    virtual ParamMap
+    extract_params();
+
+    virtual void
+    load_params(const ParamMap& params);
 
     /**
      * @brief The basic search function. It initializes with L random nodes and greedily expands the candidates. The results are pruned by the topk.

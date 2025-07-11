@@ -34,7 +34,7 @@ testCombine() {
 
     FGIM m(20);
 
-    m.Combine(indexes);
+    m.combine(indexes);
 
     recall(m, dataset, 200);
 }
@@ -53,15 +53,6 @@ testMerge() {
     nnd.build();
     nnd1.build();
     nnd2.build();
-
-    std::vector<Index> indexes;
-
-    indexes.push_back(nnd);
-    indexes.push_back(nnd1);
-    indexes.push_back(nnd2);
-
-    Graph merged;
-    FGIM m(20);
 }
 
 void
@@ -85,7 +76,7 @@ exp3_taumng(DatasetPtr& dataset) {
 
     recall(nsg, dataset, 200);
 
-    auto mng = std::make_shared<taumng::TauMNG>(dataset, nsg->extractGraph(), 10, 32, 200);
+    auto mng = std::make_shared<taumng::TauMNG>(dataset, nsg->extract_graph(), 10, 32, 200);
     mng->build();
 
     recall(mng, dataset, 200);

@@ -20,6 +20,8 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include "logger.h"
@@ -49,6 +51,10 @@
 #endif
 
 namespace graph {
+
+using Value = std::variant<uint64_t, double_t, std::string>;
+using ParamMap = std::unordered_map<std::string, Value>;
+
 template <typename T>
 class Matrix {
     unsigned col{};
@@ -111,7 +117,9 @@ class Matrix {
 
     void
     load_hdf5_data(std::ifstream& is) {
-        throw std::runtime_error("HDF5 loading is not implemented.");
+        if (is.is_open()) {
+            logger << "Loading data from HDF5 file is not implemented." << std::endl;
+        }
     }
 
 public:
@@ -253,6 +261,7 @@ public:
         } else {
             throw std::runtime_error("Unsupported file format: " + path);
         }
+        is.close();
     }
 
     /**

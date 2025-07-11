@@ -52,7 +52,7 @@ vamana_exp_observation() {
 
     recall(index, dataset, 20);
 
-    auto& ori_graph = index->extractGraph();
+    auto& ori_graph = index->extract_graph();
 
     auto datasets = std::vector<DatasetPtr>();
     dataset->split(datasets, 2);
@@ -60,11 +60,11 @@ vamana_exp_observation() {
 
     auto idx_1 = std::make_shared<diskann::Vamana>(datasets[0], 1.2, 200, 80);
     idx_1->build();
-    auto& graph_1 = idx_1->extractGraph();
+    auto& graph_1 = idx_1->extract_graph();
 
     auto idx_2 = std::make_shared<diskann::Vamana>(datasets[1], 1.2, 200, 80);
     idx_2->build();
-    auto& graph_2 = idx_2->extractGraph();
+    auto& graph_2 = idx_2->extract_graph();
 
     double hits = 0;
     double new_local = 0, new_cross = 0;
@@ -151,7 +151,7 @@ testPartialBuild() {
     auto permutation = std::vector<uint32_t>{1, 2, 3, 4};
     index->partial_build(permutation);
 
-    auto& graph = index->extractGraph();
+    auto& graph = index->extract_graph();
     std::cout << graph.size() << std::endl;
     recall(index, dataset);
 }
@@ -167,7 +167,7 @@ testMerge() {
         auto index = std::make_shared<diskann::DiskANN>(dataset, 1.2, 200, 64, 4, 2);
         index->build();
         recall(index, dataset);
-        auto& graph = index->extractGraph();
+        auto& graph = index->extract_graph();
         saveGraph(graph, dataset->getName() + "_diskann");
     }
 }
@@ -183,12 +183,12 @@ testDiskANNMerge() {
 
         index->build();
 
-        auto& graph = index->extractGraph();
+        auto& graph = index->extract_graph();
         for (auto& u : graph) {
             u.candidates_.insert(u.candidates_.end(), u.candidates_.begin(), u.candidates_.end());
             std::sort(u.candidates_.begin(), u.candidates_.end());
         }
-        auto& flatten = index->extractFlattenGraph();
+        auto& flatten = index->extract_flatten_graph();
         flatten = FlattenGraph(graph);
 
         recall(index, dataset);
@@ -204,7 +204,7 @@ vamana_exp_extend_observation() {
 
     auto total_size = dataset->getOracle()->size();
 
-    auto& ori_graph = index->extractGraph();
+    auto& ori_graph = index->extract_graph();
 
     size_t idx_size = 5;
     std::cout << "Number of splits: " << idx_size << std::endl;
@@ -221,7 +221,7 @@ vamana_exp_extend_observation() {
         auto idx = std::make_shared<diskann::Vamana>(datasets[i], 1.2, 200, 40);
         idx->build();
         indexes.emplace_back(idx);
-        graphs.emplace_back(idx->extractGraph());
+        graphs.emplace_back(idx->extract_graph());
         offsets.emplace_back(datasets[i]->getOracle()->size() + offsets[i]);
     }
 
@@ -294,8 +294,8 @@ testSimpleMerge() {
         std::vector<IndexPtr> indexes = {index2};
         index_wrapper->append(indexes);
 
-        auto& graph = index_wrapper->extractGraph();
-        auto& oracle = *(index_wrapper->extractDataset()->getOracle());
+        auto& graph = index_wrapper->extract_graph();
+        auto& oracle = *(index_wrapper->extract_dataset()->getOracle());
         std::mt19937 rng(2024);
         for (int i = 0; i < (int)graph.size(); i++) {
             if (i < (int)datasets[0]->getOracle()->size()) {
@@ -315,7 +315,7 @@ testSimpleMerge() {
         }
 
         recall(index_wrapper, datasets[0]);
-        saveGraph(index_wrapper->extractGraph(), "vamana-merge-add-" + datasets[0]->getName());
+        saveGraph(index_wrapper->extract_graph(), "vamana-merge-add-" + datasets[0]->getName());
     }
 }
 
@@ -329,7 +329,7 @@ test_save() {
     index->build();
 
     recall(index, dataset);
-    saveGraph(index->extractGraph(), "/root/mount/my-anns/output/siftsmall/vamana");
+    saveGraph(index->extract_graph(), "/root/mount/my-anns/output/siftsmall/vamana");
 
     Graph graph;
     loadGraph(graph, "/root/mount/my-anns/output/siftsmall/vamana");

@@ -56,11 +56,12 @@ Index::build() {
 }
 
 void
-Index::setSaveHelper(const uint8_t save_frequency, const std::string& save_path)  {
-    save_helper_.save_frequency = save_frequency;
-    save_helper_.save_path = save_path;
+Index::set_save_helper(const SaveHelper& saveHelper) {
+    save_helper_.save_frequency = saveHelper.save_frequency;
+    save_helper_.save_path = saveHelper.save_path;
 
-    save_helper_.save_per_count = oracle_->size() / save_frequency;
+    save_helper_.total_count = oracle_->size();
+    save_helper_.save_per_count = save_helper_.total_count / saveHelper.save_frequency;
 }
 
 void
@@ -76,7 +77,7 @@ Index::reset(DatasetPtr& dataset) {
 }
 
 Graph&
-Index::extractGraph() {
+Index::extract_graph() {
     if (!built_) {
         throw std::runtime_error("Index is not built");
     }
@@ -84,7 +85,7 @@ Index::extractGraph() {
 }
 
 DatasetPtr&
-Index::extractDataset() {
+Index::extract_dataset() {
     return dataset_;
 }
 
@@ -115,11 +116,24 @@ Index::print_info() const {
 }
 
 FlattenGraph&
-Index::extractFlattenGraph() {
+Index::extract_flatten_graph() {
     if (!built_) {
         throw std::runtime_error("Index is not built");
     }
     return flatten_graph_;
+}
+
+ParamMap
+Index::extract_params() {
+    ParamMap params;
+    params["index_type"] = "Index";
+    params["built"] = built_ ? 1ULL : 0ULL;
+    return params;
+}
+
+void
+Index::load_params(const ParamMap& params) {
+    throw std::runtime_error("Index does not need to load parameters");
 }
 
 IndexWrapper::IndexWrapper(DatasetPtr& dataset, Graph& graph) {
@@ -133,14 +147,14 @@ IndexWrapper::IndexWrapper(DatasetPtr& dataset, Graph& graph) {
 }
 
 IndexWrapper::IndexWrapper(IndexPtr& index) {
-    dataset_ = index->extractDataset();
+    dataset_ = index->extract_dataset();
     oracle_ = dataset_->getOracle();
     base_ = dataset_->getBasePtr();
     visited_list_pool_ = dataset_->getVisitedListPool();
 
     graph_.reserve(oracle_->size());
     graph_.resize(oracle_->size());
-    auto& graph = index->extractGraph();
+    auto& graph = index->extract_graph();
     for (size_t i = 0; i < oracle_->size(); ++i) {
         auto& neighbors = graph[i].candidates_;
         graph_[i].candidates_.reserve(neighbors.size());
@@ -159,7 +173,7 @@ IndexWrapper::append(std::vector<IndexPtr>& indexes) {
 
     std::vector<DatasetPtr> datasets = {dataset_};
     for (auto& index : indexes) {
-        datasets.emplace_back(index->extractDataset());
+        datasets.emplace_back(index->extract_dataset());
     }
 
     dataset_ = Dataset::aggregate(datasets);
@@ -169,7 +183,7 @@ IndexWrapper::append(std::vector<IndexPtr>& indexes) {
     graph_.reserve(oracle_->size());
 
     for (auto& index : indexes) {
-        auto& graph = index->extractGraph();
+        auto& graph = index->extract_graph();
         for (auto& neighborhood : graph) {
             graph_.emplace_back(neighborhood);
         }

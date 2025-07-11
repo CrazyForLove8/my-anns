@@ -33,18 +33,15 @@ hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
     }
 }
 
-
 hnsw::HNSW::HNSW(
-    DatasetPtr& dataset, const std::string& index_file, bool partial, int max_neighbors, int ef_construction)
+    DatasetPtr& dataset, HGraph& graph, bool partial, int max_neighbors, int ef_construction)
     : Index(dataset, false),
+      graph_(std::move(graph)),
       max_neighbors_(max_neighbors),
       max_base_neighbors_(max_neighbors * 2),
       ef_construction_(ef_construction) {
     random_engine_.seed(2024);
     reverse_ = 1 / log(1.0 * max_neighbors_);
-
-    loadHGraph(graph_, index_file, dataset_->getOracle());
-
     for (int i = graph_.size() - 1; i >= 0; --i) {
         bool found = false;
         for (int j = 0; j < graph_[i].size(); ++j) {
@@ -66,17 +63,67 @@ hnsw::HNSW::HNSW(
     } else {
         levels_.reserve(oracle_->size());
         levels_.resize(oracle_->size(), 0);
-        auto tmp = get_suffix(index_file);
-        if (tmp != "") {
-            cur_size_ = std::stoull(tmp);
-        } else {
-            cur_size_ = graph_[0].size();
-        }
+        cur_size_ = graph_[0].size();
 
         int total = oracle_->size();
 
         std::uniform_real_distribution<double> distribution(0.0, 1.0);
         for (int i = cur_size_; i < total; i++) {
+            levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+            max_level_ = std::max(max_level_, levels_[i]);
+        }
+
+        graph_.reserve(max_level_ + 1);
+        graph_.resize(max_level_ + 1);
+        for (int i = 0; i <= max_level_; ++i) {
+            graph_[i].resize(total);
+        }
+    }
+}
+
+hnsw::HNSW::HNSW(DatasetPtr& dataset, const std::string& index_file) : Index(dataset, false) {
+    auto params = loadHGraph(graph_, index_file, dataset_->getOracle());
+    if (params.find("save_point") != params.end()) {
+        cur_size_ = std::get<uint64_t>(params["save_point"]);
+    } else {
+        cur_size_ = graph_[0].size();
+    }
+    save_helper_.last_save_point = cur_size_;
+    if (params.find("max_neighbors") != params.end()) {
+        max_neighbors_ = std::get<uint64_t>(params["max_neighbors"]);
+        max_base_neighbors_ = max_neighbors_ * 2;
+    }
+    if (params.find("ef_construction") != params.end()) {
+        ef_construction_ = std::get<uint64_t>(params["ef_construction"]);
+    }
+    if (params.find("max_level") != params.end()) {
+        max_level_ = std::get<uint64_t>(params["max_level"]);
+    }
+    if (params.find("cur_max_level") != params.end()) {
+        cur_max_level_ = std::get<uint64_t>(params["cur_max_level"]);
+    }
+    if (params.find("enter_point") != params.end()) {
+        enter_point_ = std::get<uint64_t>(params["enter_point"]);
+    }
+    if (params.find("built") != params.end()) {
+        built_ = std::get<uint64_t>(params["built"]);
+        built_ = built_ && oracle_->size() == cur_size_;
+    }
+
+    random_engine_.seed(2024);
+    reverse_ = 1 / log(1.0 * max_neighbors_);
+
+    if (built_) {
+        flatten_graph_ = FlattenHGraph(graph_);
+    } else {
+        logger << "Graph unbuilt, initializing levels and graph structure." << std::endl;
+        levels_.reserve(oracle_->size());
+        levels_.resize(oracle_->size(), 0);
+
+        auto total = oracle_->size();
+
+        std::uniform_real_distribution<double> distribution(0.0, 1.0);
+        for (auto i = cur_size_; i < total; i++) {
             levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
             max_level_ = std::max(max_level_, levels_[i]);
         }
@@ -296,6 +343,8 @@ hnsw::HNSW::print_info() const {
     logger << "Max Base Neighbors: " << max_base_neighbors_ << std::endl;
     logger << "EF Construction: " << ef_construction_ << std::endl;
     logger << "Max Level: " << max_level_ << std::endl;
+    logger << "Current Max Level: " << cur_max_level_ << std::endl;
+    logger << "Enter Point: " << enter_point_ << std::endl;
 
     if (max_neighbors_ == 0 || max_base_neighbors_ == 0 || ef_construction_ == 0) {
         logger << "Warning: max_neighbors, max_base_neighbors, and ef_construction should be "
@@ -305,13 +354,13 @@ hnsw::HNSW::print_info() const {
 }
 
 Graph&
-hnsw::HNSW::extractGraph() {
+hnsw::HNSW::extract_graph() {
     throw std::runtime_error(
-        "HNSW does not support extractGraph, please use extractHGraph instead");
+        "HNSW does not support extract_graph, please use extract_hgraph instead");
 }
 
 HGraph&
-hnsw::HNSW::extractHGraph() {
+hnsw::HNSW::extract_hgraph() {
     if (!built_) {
         throw std::runtime_error("Index is not built yet");
     }
@@ -379,18 +428,18 @@ hnsw::HNSW::partial_build(uint64_t num) {
     {
 #pragma omp parallel for schedule(dynamic)
         for (auto i = start; i < end; ++i) {
+            if (save_helper_.should_save(i)) {
+                logger << "Saving temporary index to " << save_helper_.save_path << std::endl;
+                auto params = extract_params();
+                params["save_point"] = i;
+                saveHGraph(graph_, save_helper_.save_path, params);
+                logger << "Saved index at point " << i << std::endl;
+            }
+
             if (i % 100000 == 0) {
                 logger << "Adding " << i << " / " << end << std::endl;
             }
             addPoint(i);
-
-            if (save_helper_.is_enabled() && i % save_helper_.get_interval() == 0) {
-                auto path = append(save_helper_.save_path, filename_separator() + std::to_string(i));
-                logger << "Saving temporary index to " << path << std::endl;
-                check_prefix_and_remove(path);
-                saveHGraph(graph_, save_helper_.save_path);
-                logger << "Saved index at point " << i << std::endl;
-            }
         }
     }
     timer.end();
@@ -430,7 +479,7 @@ hnsw::HNSW::build() {
 
     flatten_graph_ = FlattenHGraph(graph_);
     built_ = true;
-    logger << "Index built successfully." << std::endl;
+    logger << "HNSW Index built successfully." << std::endl;
 }
 
 void
@@ -492,4 +541,35 @@ hnsw::HNSW::set_ef_construction(int ef_construction) {
 void
 hnsw::HNSW::set_cur_size(uint64_t cur_size) {
     cur_size_ = cur_size;
+}
+
+ParamMap
+hnsw::HNSW::extract_params() {
+    auto params = Index::extract_params();
+    params["index_type"] = "HNSW";
+    params["max_neighbors"] = max_neighbors_;
+    params["ef_construction"] = ef_construction_;
+    params["enter_point"] = enter_point_;
+    params["max_level"] = max_level_;
+    params["cur_max_level"] = cur_max_level_;
+    return params;
+}
+void
+hnsw::HNSW::load_params(const ParamMap& params) {
+    if (params.find("max_neighbors") != params.end()) {
+        max_neighbors_ = std::get<uint64_t>(params.at("max_neighbors"));
+        max_base_neighbors_ = max_neighbors_ * 2;
+    }
+    if (params.find("ef_construction") != params.end()) {
+        ef_construction_ = std::get<uint64_t>(params.at("ef_construction"));
+    }
+    if (params.find("enter_point") != params.end()) {
+        enter_point_ = std::get<uint64_t>(params.at("enter_point"));
+    }
+    if (params.find("max_level") != params.end()) {
+        max_level_ = std::get<uint64_t>(params.at("max_level"));
+    }
+    if (params.find("cur_max_level") != params.end()) {
+        cur_max_level_ = std::get<uint64_t>(params.at("cur_max_level"));
+    }
 }

@@ -259,15 +259,15 @@ int
 checkConnectivity(const Graph& graph);
 
 std::string
-saveGraph(Graph& graph, const std::string& filename);
+saveGraph(Graph& graph, const std::string& filename, const ParamMap& params = {});
 
 std::string
-saveHGraph(HGraph& hgraph, const std::string& filename);
+saveHGraph(HGraph& hgraph, const std::string& filename, const ParamMap& params = {});
 
-void
+ParamMap
 loadGraph(Graph& graph, const std::string& index_path, const OraclePtr& oracle = nullptr);
 
-void
+ParamMap
 loadHGraph(HGraph& hgraph, const std::string& index_path, const OraclePtr& oracle = nullptr);
 }  // namespace graph
 

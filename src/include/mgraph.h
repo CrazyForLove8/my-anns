@@ -52,23 +52,25 @@ public:
                     unsigned int ef_construction,
                     float sample_rate = 0.3);
 
-    explicit MGraph(DatasetPtr& dataset,
-                    std::string& index_path,
-                    unsigned int max_degree,
-                    unsigned int ef_construction,
-                    float sample_rate = 0.3);
+    explicit MGraph(DatasetPtr& dataset, const std::string& index_path);
 
     Graph&
-    extractGraph() override;
+    extract_graph() override;
 
     HGraph&
-    extractHGraph();
+    extract_hgraph();
 
     void
-    Combine(std::vector<IndexPtr>& indexes) override;
+    combine(std::vector<IndexPtr>& indexes) override;
 
     Neighbors
     search(const float* query, unsigned int topk, unsigned int L) const override;
+
+    ParamMap
+    extract_params() override;
+
+    void
+    load_params(const graph::ParamMap& params) override;
 
     void
     print_info() const override;

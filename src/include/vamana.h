@@ -62,6 +62,9 @@ public:
 
     void
     print_info() const override;
+
+    ParamMap
+    extract_params() override;
 };
 
 class DiskANN : public Index {

@@ -25,7 +25,7 @@ protected:
 
     uint64_t start_id_{0};
 
-    uint64_t start_iter_{0};
+    uint64_t start_iter_{1};
 
     uint64_t max_index_size_{0};
 
@@ -69,18 +69,24 @@ public:
 
     explicit FGIM(unsigned max_degree, float sample_rate = 0.3);
 
-    FGIM(DatasetPtr& dataset, unsigned max_degree, float sample_rate = 0.3, bool allocate = true);
+    explicit FGIM(DatasetPtr& dataset,
+                  unsigned max_degree = 20,
+                  float sample_rate = 0.3,
+                  bool allocate = true);
 
     ~FGIM() override = default;
 
     virtual void
-    Combine(std::vector<IndexPtr>& indexes);
+    combine(std::vector<IndexPtr>& indexes);
 
     void
     set_serial(const std::string& serial);
 
     [[nodiscard]] const std::string&
     get_serial() const;
+
+    ParamMap
+    extract_params() override;
 
     void
     print_info() const override;

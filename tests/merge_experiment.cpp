@@ -33,7 +33,7 @@ mergeExp1_1(DatasetPtr& dataset) {
         {
             std::cout << "Parameter: Max degree: " << param << std::endl;
             MGraph mgraph(merged_dataset, param, 200);
-            mgraph.Combine(vec);
+            mgraph.combine(vec);
             recall(mgraph, merged_dataset, 200);
         }
     }
@@ -72,7 +72,7 @@ mergeExp1_2(DatasetPtr& dataset) {
             }
             timer.end();
             std::cout << "Total adding time: " << timer.elapsed() << "s" << std::endl;
-            recall(vec[0], vec[0]->extractDataset(), 200);
+            recall(vec[0], vec[0]->extract_dataset(), 200);
         }
     }
 }
@@ -106,7 +106,7 @@ mergeExp2_1(DatasetPtr& dataset) {
         {
             std::cout << "Parameter: Max degree: " << param << std::endl;
             std::shared_ptr<MGraph> mgraph = std::make_shared<MGraph>(merged_dataset, param, 200);
-            mgraph->Combine(vec);
+            mgraph->combine(vec);
             recall(mgraph, merged_dataset, -1, 100);
         }
     }
@@ -142,7 +142,7 @@ mergeExp2_2(DatasetPtr& dataset) {
             }
             timer.end();
             std::cout << "Total adding time: " << timer.elapsed() << "s" << std::endl;
-            recall(vec[0], vec[0]->extractDataset(), -1, 100);
+            recall(vec[0], vec[0]->extract_dataset(), -1, 100);
         }
     }
 }
@@ -170,7 +170,7 @@ mergeExp3_1(DatasetPtr& dataset) {
     auto merged_dataset = Dataset::aggregate(datasets);
     {
         MGraph mgraph(merged_dataset, param, 200);
-        mgraph.Combine(indexes);
+        mgraph.combine(indexes);
         recall(mgraph, merged_dataset);
     }
 }
@@ -206,7 +206,7 @@ mergeExp5_1(DatasetPtr& dataset) {
         omp_set_num_threads(1);
         {
             MGraph mgraph(merged_dataset, max_degree, 200);
-            mgraph.Combine(vec);
+            mgraph.combine(vec);
             recall(mgraph, merged_dataset, 200);
         }
 
@@ -242,10 +242,10 @@ mergeExp5_2(DatasetPtr& dataset) {
             }
             timer.end();
             std::cout << "Total adding time: " << timer.elapsed() << "s" << std::endl;
-            recall(hnsw, hnsw->extractDataset(), 200);
+            recall(hnsw, hnsw->extract_dataset(), 200);
         }
 
-        dataset = hnsw->extractDataset();
+        dataset = hnsw->extract_dataset();
     }
 }
 
@@ -278,7 +278,7 @@ mergeExp6_1(DatasetPtr& dataset) {
     omp_set_num_threads(1);
     {
         MGraph mgraph(merged_dataset, 32, 200);
-        mgraph.Combine(vec);
+        mgraph.combine(vec);
         //        recall(mgraph, merged_dataset, 200);
     }
 }
@@ -314,8 +314,8 @@ mergeExp6_2(DatasetPtr& dataset) {
         std::cout << "Parameter: Max degree: " << param << std::endl;
         std::cout << "Parameter: ef_construction: " << param << std::endl;
         FGIM mgraph(merged_dataset, param);
-        mgraph.Combine(vec);
-        std::cout << checkConnectivity(mgraph.extractGraph()) << std::endl;
+        mgraph.combine(vec);
+        std::cout << checkConnectivity(mgraph.extract_graph()) << std::endl;
     }
 }
 
@@ -340,10 +340,10 @@ mergeExp6_3(DatasetPtr& dataset) {
     {
         std::cout << "Parameter: Max degree: " << 16 << std::endl;
         MGraph mgraph(dataset, 32, 200);
-        mgraph.Combine(vec);
+        mgraph.combine(vec);
         recall(mgraph, dataset);
 
-        auto& graph = mgraph.extractHGraph();
+        auto& graph = mgraph.extract_hgraph();
 
         std::cout << checkConnectivity(graph[0]) << std::endl;
     }
@@ -374,7 +374,7 @@ exp_multiple(DatasetPtr& dataset) {
         }
 
         MGraph mgraph(dataset, max_degree, 200);
-        mgraph.Combine(vec);
+        mgraph.combine(vec);
         recall(mgraph, dataset);
     }
 
@@ -387,7 +387,7 @@ exp_multiple(DatasetPtr& dataset) {
         hnsw->build();
 
         auto another =
-            std::make_shared<hnsw::HNSW>(dataset, hnsw->extractHGraph(), true, max_degree, 200);
+            std::make_shared<hnsw::HNSW>(dataset, hnsw->extract_hgraph(), true, max_degree, 200);
         another->partial_build();
 
         recall(another, dataset);
@@ -424,7 +424,7 @@ mergeExp9(DatasetPtr& dataset) {
         {
             std::cout << "Parameter: Max degree: " << param << std::endl;
             MGraph mgraph(merged_dataset, param, 200);
-            mgraph.Combine(vec);
+            mgraph.combine(vec);
             recall(mgraph, merged_dataset, 200);
         }
     }
@@ -461,7 +461,7 @@ mergeExp10(DatasetPtr& dataset) {
         {
             std::cout << "Parameter: Max degree: " << param << std::endl;
             MGraph mgraph(merged_dataset, param, 200);
-            mgraph.Combine(vec);
+            mgraph.combine(vec);
             recall(mgraph, merged_dataset, 200);
         }
     }
@@ -472,11 +472,11 @@ mergeExp10(DatasetPtr& dataset) {
 int
 main() {
     Log::setVerbose(true);
-    print_memory_usage_linux();
+    print_memory_usage();
     auto dataset = Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
                                         "/root/mount/dataset/internet_search/internet_search_test.fbin",
                                         "/root/mount/dataset/internet_search/internet_search_neighbors.fbin", DISTANCE::L2);
-    print_memory_usage_linux();
+    print_memory_usage();
     // mergeExp6_3(dataset);
 
 #if ALARM_FINISHED

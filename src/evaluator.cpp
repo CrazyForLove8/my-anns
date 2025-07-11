@@ -87,13 +87,13 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             search_Ls = {
                 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600};
         } else {
-            for (int i = 20; i <= 100; i += 5) {
+            for (int i = 20; i < 100; i += 5) {
                 search_Ls.push_back(i);
             }
-            for (int i = 100; i <= 400; i += 10) {
+            for (int i = 100; i < 400; i += 10) {
                 search_Ls.push_back(i);
             }
-            for (int i = 500; i <= 1000; i += 100) {
+            for (int i = 400; i <= 800; i += 100) {
                 search_Ls.push_back(i);
             }
         }
@@ -243,11 +243,11 @@ calDist(const IndexPtr& index,
     size_t enter_point;
     if (dynamic_cast<hnsw::HNSW*>(index.get())) {
         auto hnsw_index = std::static_pointer_cast<hnsw::HNSW>(index);
-        hgraph = hnsw_index->extractHGraph();
+        hgraph = hnsw_index->extract_hgraph();
         enter_point = hnsw_index->enter_point_;
     } else if (dynamic_cast<MGraph*>(index.get())) {
         auto mgraph_index = std::static_pointer_cast<MGraph>(index);
-        hgraph = mgraph_index->extractHGraph();
+        hgraph = mgraph_index->extract_hgraph();
         enter_point = mgraph_index->enter_point_;
     } else {
         float recall = 0;
@@ -260,7 +260,7 @@ calDist(const IndexPtr& index,
             for (size_t i = 0; i < qsize; ++i) {
                 auto result = searchWithDist(dataset->getOracle().get(),
                                              dataset->getVisitedListPool().get(),
-                                             index->extractGraph(),
+                                             index->extract_graph(),
                                              query[i],
                                              K,
                                              L);

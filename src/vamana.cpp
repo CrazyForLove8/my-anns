@@ -90,7 +90,7 @@ diskann::Vamana::build_internal() {
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < n; ++i) {
-        if (i % 10000 == 0) {
+        if (i % 100000 == 0) {
             logger << "Processing " << i << " / " << graph_.size() << std::endl;
         }
         auto res = track_search(
@@ -132,7 +132,6 @@ diskann::Vamana::partial_build(std::vector<uint32_t>& permutation) {
         std::sort(graph_[permutation[u]].candidates_.begin(),
                   graph_[permutation[u]].candidates_.end());
     }
-    logger << "2" << std::endl;
 
     auto* center = new float[oracle_->dim()];
     for (unsigned i = 0; i < n; ++i) {
@@ -190,6 +189,15 @@ diskann::Vamana::print_info() const {
     logger << "R: " << R_ << std::endl;
 }
 
+ParamMap
+diskann::Vamana::extract_params() {
+    ParamMap params = Index::extract_params();
+    params["alpha"] = alpha_;
+    params["L"] = (uint64_t)L_;
+    params["R"] = (uint64_t)R_;
+    return params;
+}
+
 diskann::DiskANN::DiskANN(DatasetPtr& dataset, float alpha, int L, int R, int k, int ell)
     : Index(dataset), alpha_(alpha), L_(L), R_(R), k_(k), ell_(ell) {
 }
@@ -218,7 +226,7 @@ diskann::DiskANN::build_internal() {
     }
 
     for (auto& index : indexes) {
-        auto& graph = index->extractGraph();
+        auto& graph = index->extract_graph();
         for (int i = 0; i < oracle_->size(); ++i) {
             graph_[i].candidates_.insert(graph_[i].candidates_.end(),
                                          graph[i].candidates_.begin(),

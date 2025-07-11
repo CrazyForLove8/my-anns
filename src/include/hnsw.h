@@ -74,10 +74,13 @@ public:
     HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
 
     HNSW(DatasetPtr& dataset,
-         const std::string& index_file,
+         HGraph& graph,
          bool partial = false,
          int max_neighbors = 32,
          int ef_construction = 200);
+
+    HNSW(DatasetPtr& dataset, const std::string& index_file);
+
     ~HNSW() override = default;
 
     void
@@ -99,16 +102,22 @@ public:
     partial_build(uint64_t num = 0);
 
     Graph&
-    extractGraph() override;
+    extract_graph() override;
 
     HGraph&
-    extractHGraph();
+    extract_hgraph();
+
+    ParamMap
+    extract_params() override;
 
     void
     add(DatasetPtr& dataset) override;
 
     Neighbors
     search(const float* query, unsigned int topk, unsigned int L) const override;
+
+    void
+    load_params(const graph::ParamMap& params) override;
 
     void
     print_info() const override;

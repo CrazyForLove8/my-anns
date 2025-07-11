@@ -8,11 +8,11 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <string>
 #include <vector>
-#include <random>
 
-#include "logger.h"
+#include "dtype.h"
 
 std::string
 filename_separator();
@@ -26,11 +26,23 @@ append(const std::string& filename, const std::string& suffix);
 std::string
 get_suffix(const std::string& filename, int n = -1);
 
+bool
+check_if_exist(const std::string& filename);
+
 void
 check_and_remove(const std::string& filename);
 
 void
 check_prefix_and_remove(const std::string& file_path_with_prefix);
+
+class ParamsHelper {
+public:
+    static void
+    write(const graph::ParamMap& map, std::ofstream& out);
+
+    static void
+    read(graph::ParamMap& map, std::ifstream& in);
+};
 
 class CsvLogger {
 public:
