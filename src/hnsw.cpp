@@ -547,11 +547,11 @@ ParamMap
 hnsw::HNSW::extract_params() {
     auto params = Index::extract_params();
     params["index_type"] = "HNSW";
-    params["max_neighbors"] = max_neighbors_;
-    params["ef_construction"] = ef_construction_;
-    params["enter_point"] = enter_point_;
-    params["max_level"] = max_level_;
-    params["cur_max_level"] = cur_max_level_;
+    params["max_neighbors"] = (uint64_t) max_neighbors_;
+    params["ef_construction"] = (uint64_t) ef_construction_;
+    params["enter_point"] = (uint64_t) enter_point_;
+    params["max_level"] = (uint64_t) max_level_;
+    params["cur_max_level"] = (uint64_t) cur_max_level_;
     return params;
 }
 void

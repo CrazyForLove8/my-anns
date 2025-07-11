@@ -403,7 +403,7 @@ ParamMap
 MGraph::extract_params() {
     auto params = FGIM::extract_params();
     params["index_type"] = "MGraph";
-    params["ef_construction"] = ef_construction_;
+    params["ef_construction"] = (uint64_t) ef_construction_;
     return params;
 }
 void

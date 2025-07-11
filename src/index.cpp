@@ -127,7 +127,7 @@ ParamMap
 Index::extract_params() {
     ParamMap params;
     params["index_type"] = "Index";
-    params["built"] = built_ ? 1ULL : 0ULL;
+    params["built"] = (uint64_t)(built_ ? 1ULL : 0ULL);
     return params;
 }
 

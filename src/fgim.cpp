@@ -641,7 +641,7 @@ ParamMap
 FGIM::extract_params() {
     auto params = Index::extract_params();
     params["index_type"] = "FGIM";
-    params["max_degree"] = max_degree_;
+    params["max_degree"] = (uint64_t) max_degree_;
     params["sample_rate"] = sample_rate_;
     return params;
 }
