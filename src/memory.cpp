@@ -31,7 +31,9 @@ print_memory_usage() {
     file.close();
 
     std::cout << "--- Linux Process Memory Usage ---" << std::endl;
-    std::cout << "Resident Set Size (RSS): " << vm_rss << " KB (" << (double)vm_rss / 1024.0 / 1024.0 << " GB)" << std::endl;
-    std::cout << "Virtual Memory Size (VmSize): " << vm_size << " KB (" << (double)vm_size / 1024.0 / 1024.0 << " GB)" << std::endl;
+    std::cout << "Resident Set Size (RSS): " << vm_rss << " KB ("
+              << (double)vm_rss / 1024.0 / 1024.0 << " GB)" << std::endl;
+    std::cout << "Virtual Memory Size (VmSize): " << vm_size << " KB ("
+              << (double)vm_size / 1024.0 / 1024.0 << " GB)" << std::endl;
     std::cout << "----------------------------------" << std::endl;
 }

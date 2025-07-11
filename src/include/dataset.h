@@ -6,6 +6,7 @@
 #define MYANNS_DATASET_H
 
 #include <unordered_set>
+
 #include "dtype.h"
 #include "metric.h"
 #include "visittable.h"

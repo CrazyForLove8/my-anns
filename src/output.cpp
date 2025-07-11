@@ -10,7 +10,7 @@ filename_separator() {
 }
 
 std::string
-get_path(std::string filename){
+get_path(std::string filename) {
     if (filename.find(".bin") == std::string::npos) {
         filename += ".bin";
     }
@@ -66,7 +66,8 @@ check_if_exist(const std::string& filename) {
     return std::filesystem::exists(p) && std::filesystem::is_regular_file(p);
 }
 
-void check_and_remove(const std::string& filename){
+void
+check_and_remove(const std::string& filename) {
     std::filesystem::path p(filename);
     if (std::filesystem::exists(p)) {
         logger << "Removing existing file: " << p << std::endl;
@@ -74,7 +75,8 @@ void check_and_remove(const std::string& filename){
     }
 }
 
-void check_prefix_and_remove(const std::string& file_path_with_prefix) {
+void
+check_prefix_and_remove(const std::string& file_path_with_prefix) {
     std::filesystem::path full_path(file_path_with_prefix);
     std::filesystem::path directory = full_path.parent_path();
     if (directory.empty()) {
@@ -92,7 +94,8 @@ void check_prefix_and_remove(const std::string& file_path_with_prefix) {
                 try {
                     std::filesystem::remove(entry.path());
                 } catch (const std::filesystem::filesystem_error& e) {
-                    logger << "Error removing file: " << entry.path() << " - " << e.what() << std::endl;
+                    logger << "Error removing file: " << entry.path() << " - " << e.what()
+                           << std::endl;
                 }
             }
         }

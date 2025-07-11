@@ -6,9 +6,9 @@
 #define MYANNS_ANNSLIB_H
 
 #include "evaluator.h"
-#include "memory.h"
 #include "fgim.h"
 #include "hnsw.h"
+#include "memory.h"
 #include "mgraph.h"
 #include "nndescent.h"
 #include "nnmerge.h"

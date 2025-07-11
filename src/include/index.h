@@ -11,10 +11,10 @@
 #include <unordered_set>
 
 #include "dataset.h"
-#include "memory.h"
 #include "dtype.h"
 #include "graph.h"
 #include "logger.h"
+#include "memory.h"
 #include "metric.h"
 #include "timer.h"
 #include "visittable.h"
@@ -29,11 +29,13 @@ struct SaveHelper {
     uint64_t total_count{0};
     uint64_t last_save_point{0};
 
-    [[nodiscard]] bool is_enabled() const {
+    [[nodiscard]] bool
+    is_enabled() const {
         return save_frequency > 0 && !save_path.empty();
     }
 
-    [[nodiscard]] uint64_t get_interval() const {
+    [[nodiscard]] uint64_t
+    get_interval() const {
         return save_per_count > 0 ? save_per_count : ((save_frequency + 1) * 100000000);
     }
 

@@ -24,8 +24,8 @@
 
 #include "dataset.h"
 #include "dtype.h"
-#include "visittable.h"
 #include "output.h"
+#include "visittable.h"
 
 namespace graph {
 
@@ -132,7 +132,8 @@ struct FlattenGraph {
 
     explicit FlattenGraph(const Graph& graph);
 
-    virtual std::vector<int> operator[](int i) const;
+    virtual std::vector<int>
+    operator[](int i) const;
 
     virtual ~FlattenGraph() = default;
 };
@@ -144,7 +145,8 @@ struct FlattenHGraph {
 
     explicit FlattenHGraph(const HGraph& graph);
 
-    FlattenGraph& operator[](int i) const;
+    FlattenGraph&
+    operator[](int i) const;
 
     [[nodiscard]] int
     size() const;

@@ -473,9 +473,11 @@ int
 main() {
     Log::setVerbose(true);
     print_memory_usage();
-    auto dataset = Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
-                                        "/root/mount/dataset/internet_search/internet_search_test.fbin",
-                                        "/root/mount/dataset/internet_search/internet_search_neighbors.fbin", DISTANCE::L2);
+    auto dataset =
+        Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
+                             "/root/mount/dataset/internet_search/internet_search_test.fbin",
+                             "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
+                             DISTANCE::L2);
     print_memory_usage();
     // mergeExp6_3(dataset);
 

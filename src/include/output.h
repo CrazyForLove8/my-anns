@@ -86,17 +86,13 @@ private:
     template <typename T>
     std::string
     toCsvString(T value) {
-        if
-            constexpr(std::is_floating_point_v<T>) {
-                std::ostringstream oss;
-                oss << std::fixed << std::setprecision(precision_) << value;
-                return oss.str();
-            }
-        else if
-            constexpr(std::is_same_v<T, std::string>) {
-                return toCsvString(value);
-            }
-        else {
+        if constexpr (std::is_floating_point_v<T>) {
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(precision_) << value;
+            return oss.str();
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return toCsvString(value);
+        } else {
             std::ostringstream oss;
             oss << value;
             return oss.str();

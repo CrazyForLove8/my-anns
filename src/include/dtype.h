@@ -206,11 +206,13 @@ public:
         return data.get() == m.data.get();
     }
 
-    T* operator[](unsigned i) {
+    T*
+    operator[](unsigned i) {
         return reinterpret_cast<T*>(data.get() + stride * i + offset_bytes);
     }
 
-    T const* operator[](unsigned i) const {
+    T const*
+    operator[](unsigned i) const {
         return reinterpret_cast<T const*>(data.get() + stride * i + offset_bytes);
     }
 
@@ -489,14 +491,16 @@ public:
         return cols;
     }
 
-    T const* operator[](const unsigned i) const {
+    T const*
+    operator[](const unsigned i) const {
 #ifdef USE_SSE
         _mm_prefetch(data + stride * i, _MM_HINT_T0);
 #endif
         return reinterpret_cast<T const*>(data + stride * i);
     }
 
-    T* operator[](unsigned i) {
+    T*
+    operator[](unsigned i) {
 #ifdef USE_SSE
         _mm_prefetch(data + stride * i, _MM_HINT_T0);
 #endif
@@ -525,7 +529,8 @@ public:
     virtual T
     operator()(const T*, const T*) const = 0;
 
-    virtual T* operator[](unsigned i) const = 0;
+    virtual T*
+    operator[](unsigned i) const = 0;
 
     virtual ~IndexOracle() = default;
 };
@@ -570,7 +575,8 @@ public:
         return DIST_TYPE::apply(vec1, vec2, proxy.dim());
     }
 
-    T* operator[](unsigned i) const override {
+    T*
+    operator[](unsigned i) const override {
         return const_cast<T*>(proxy[i]);
     }
 

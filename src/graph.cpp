@@ -149,7 +149,8 @@ FlattenGraph::FlattenGraph(const Graph& graph) {
     }
 }
 
-std::vector<int> FlattenGraph::operator[](int i) const {
+std::vector<int>
+FlattenGraph::operator[](int i) const {
     return {final_graph.begin() + offsets[i], final_graph.begin() + offsets[i + 1]};
 }
 
@@ -165,7 +166,8 @@ FlattenHGraph::FlattenHGraph(const HGraph& graph) {
     }
 }
 
-FlattenGraph& FlattenHGraph::operator[](int i) const {
+FlattenGraph&
+FlattenHGraph::operator[](int i) const {
     return const_cast<FlattenGraph&>(graphs_[i]);
 }
 
