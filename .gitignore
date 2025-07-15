@@ -34,3 +34,5 @@
 Insights.md
 build/
 output/
+.idea/
+__pycache__/

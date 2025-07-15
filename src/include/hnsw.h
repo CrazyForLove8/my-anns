@@ -20,9 +20,9 @@ protected:
 
     FlattenHGraph flatten_graph_;
 
-    uint32_t max_neighbors_{};
+    uint32_t max_neighbors_{32};
 
-    uint32_t max_base_neighbors_{};
+    uint32_t max_base_neighbors_{64};
 
     uint32_t max_level_{};
 

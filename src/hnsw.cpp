@@ -559,6 +559,7 @@ hnsw::HNSW::load_params(const ParamMap& params) {
     if (params.find("max_neighbors") != params.end()) {
         max_neighbors_ = std::get<uint64_t>(params.at("max_neighbors"));
         max_base_neighbors_ = max_neighbors_ * 2;
+        reverse_ = 1 / log(1.0 * max_neighbors_);
     }
     if (params.find("ef_construction") != params.end()) {
         ef_construction_ = std::get<uint64_t>(params.at("ef_construction"));

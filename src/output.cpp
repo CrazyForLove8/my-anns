@@ -137,6 +137,10 @@ ParamsHelper::write(const ParamMap& map, std::ofstream& out) {
 
 void
 ParamsHelper::read(ParamMap& map, std::ifstream& in) {
+    if (!in.good()) {
+        return;
+    }
+
     size_t count;
     in.read(reinterpret_cast<char*>(&count), sizeof(count));
 

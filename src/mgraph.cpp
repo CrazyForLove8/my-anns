@@ -1,8 +1,7 @@
 #include "mgraph.h"
 
 MGraph::MGraph()
-    : FGIM(),
-      random_engine_(2024),
+    : random_engine_(2024),
       enter_point_(0),
       max_level_(0),
       cur_max_level_(0),

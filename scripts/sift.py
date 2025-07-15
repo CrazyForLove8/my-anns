@@ -1,8 +1,8 @@
 from vecs_util import *
 
-base_path = "/root/mount/dataset/siftsmall/siftsmall_base.fvecs"
-query_path = "/root/mount/dataset/siftsmall/siftsmall_query.fvecs"
-gt_path = "/root/mount/dataset/siftsmall/siftsmall_gt.ivecs"
+base_path = "/root/mount/dataset/sift10m/sift10m_base.fvecs"
+query_path = "/root/mount/dataset/sift10m/sift10m_query.fvecs"
+gt_path = "/root/mount/dataset/sift10m/sift10m_gt.ivecs"
 
 # check_fvecs_file(base_path)
 
@@ -26,9 +26,17 @@ if __name__ == "__main__":
 
     print("base:" + str(base.shape))
 
+    # truncate the first 5M vectors from the base
+    base = base[5000000:]
+    print("base after truncation:" + str(base.shape))
+    print("query:" + str(query.shape))
+
+    # save the truncated base
+    write_fvecs(base, "/root/mount/dataset/sift10m/sift5m_base.fvecs")
+
     indices, distances = calculate_gt(base, query, 100, metric='euclidean')
 
     print("indices shape: " + str(indices.shape))
     print("distances shape: " + str(distances.shape))
     print("Saving indices and distances")
-    write_ivecs(indices, gt_path)
+    write_ivecs(indices, "/root/mount/dataset/sift10m/sift5m_gt.ivecs")

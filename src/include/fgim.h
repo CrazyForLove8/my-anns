@@ -15,11 +15,11 @@
 
 class FGIM : public Index {
 protected:
-    uint32_t max_degree_;
+    uint32_t max_degree_{32};
 
-    uint32_t max_base_degree_;
+    uint32_t max_base_degree_{64};
 
-    float sample_rate_;
+    float sample_rate_{0.3};
 
     std::vector<uint64_t> offsets_;
 
