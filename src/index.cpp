@@ -136,6 +136,11 @@ Index::load_params(const ParamMap& params) {
     throw std::runtime_error("Index does not need to load parameters");
 }
 
+void
+Index::remove(IdType id) {
+    throw std::runtime_error("Index does not support remove operation");
+}
+
 IndexWrapper::IndexWrapper(DatasetPtr& dataset, Graph& graph) {
     dataset_ = dataset;
     oracle_ = dataset->getOracle();

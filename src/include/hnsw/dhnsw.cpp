@@ -1,4 +1,4 @@
-#include "dhnsw.h"
+#include "hnsw/dhnsw.h"
 
 dhnsw::DHNSW::DHNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction, float lambda)
     : HNSW(dataset, max_neighbors, ef_construction), lambda_(lambda) {
@@ -14,7 +14,7 @@ naive(Neighbors res, IndexOracle<float>* oracle, int topk, float lambda) {
     // lambda controls the pruning threshold
     int idx = 1;
     while (idx < res.size() && ret.size() < topk) {
-        if (res[idx].id == -1) {
+        if (res[idx].id == std::numeric_limits<IdType>::max()) {
             break;
         }
         bool add = true;

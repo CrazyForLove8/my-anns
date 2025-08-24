@@ -321,9 +321,8 @@ mergeExp6_2(DatasetPtr& dataset) {
 
 void
 mergeExp6_3(DatasetPtr& dataset) {
-    Log::redirect("6.3_" + dataset->getName() + "_repair_no_in_degree");
+    Log::redirect("6.3" + dataset->getName() + "_repair");
     std::cout << "Exp6.3: Repair no in-degree\n";
-    std::cout << "Baseline" << std::endl;
     std::cout << "Current Time: " << Log::getTimestamp() << "\n";
     std::cout << "Dataset name: " << dataset->getName() << " size: " << dataset->getSize()
               << std::endl;
@@ -332,14 +331,21 @@ mergeExp6_3(DatasetPtr& dataset) {
     std::cout << "Number of splits: " << num_splits << std::endl;
     auto datasets = dataset->subsets(num_splits);
 
-    std::vector<IndexPtr> vec(datasets.size());
-    for (size_t i = 0; i < datasets.size(); i++) {
-        vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], 32, 200);
-        vec[i]->build();
-    }
-    {
-        std::cout << "Parameter: Max degree: " << 16 << std::endl;
-        MGraph mgraph(dataset, 32, 200);
+    for (int it = 0; it < 2; ++it) {
+        std::cout << "Trying with " << it + 1 << " iterations" << std::endl;
+        std::vector<IndexPtr> vec(datasets.size());
+        int max_degree;
+        if (dataset->getName() == "sift" || dataset->getName() == "msong" ||
+            dataset->getName() == "deep") {
+            max_degree = 20;
+        } else {
+            max_degree = 32;
+        }
+        for (size_t i = 0; i < datasets.size(); i++) {
+            vec[i] = std::make_shared<hnsw::HNSW>(datasets[i], max_degree, 200);
+            vec[i]->build();
+        }
+        MGraph mgraph(dataset, max_degree, 200);
         mgraph.combine(vec);
         recall(mgraph, dataset);
 
@@ -376,22 +382,23 @@ exp_multiple(DatasetPtr& dataset) {
         MGraph mgraph(dataset, max_degree, 200);
         mgraph.combine(vec);
         recall(mgraph, dataset);
+        max_degree += 2;
     }
 
-    std::cout << "Baseline method" << std::endl;
-    for (auto num_split : split) {
-        std::cout << "Number of splits: " << num_split << std::endl;
-        auto datasets = dataset->subsets(num_split);
-
-        auto hnsw = std::make_shared<hnsw::HNSW>(datasets[0], max_degree, 200);
-        hnsw->build();
-
-        auto another =
-            std::make_shared<hnsw::HNSW>(dataset, hnsw->extract_hgraph(), true, max_degree, 200);
-        another->partial_build();
-
-        recall(another, dataset);
-    }
+    //    std::cout << "Baseline method" << std::endl;
+    //    for (auto num_split : split) {
+    //        std::cout << "Number of splits: " << num_split << std::endl;
+    //        auto datasets = dataset->subsets(num_split);
+    //
+    //        auto hnsw = std::make_shared<hnsw::HNSW>(datasets[0], max_degree, 200);
+    //        hnsw->build();
+    //
+    //        auto another =
+    //            std::make_shared<hnsw::HNSW>(dataset, hnsw->extract_hgraph(), true, max_degree, 200);
+    //        another->partial_build();
+    //
+    //        recall(another, dataset);
+    //    }
 }
 
 void
@@ -467,19 +474,14 @@ mergeExp10(DatasetPtr& dataset) {
     }
 }
 
-#define ALARM_FINISHED 0
+#define ALARM_FINISHED 1
 
 int
 main() {
     Log::setVerbose(true);
-    print_memory_usage();
-    auto dataset =
-        Dataset::getInstance("/root/mount/dataset/internet_search/internet_search_train.fbin",
-                             "/root/mount/dataset/internet_search/internet_search_test.fbin",
-                             "/root/mount/dataset/internet_search/internet_search_neighbors.fbin",
-                             DISTANCE::L2);
-    print_memory_usage();
-    // mergeExp6_3(dataset);
+    auto dataset = Dataset::getInstance("msong", "1m");
+    //    print_memory_usage();
+    exp_multiple(dataset);
 
 #if ALARM_FINISHED
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");

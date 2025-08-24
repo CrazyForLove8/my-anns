@@ -76,17 +76,19 @@ Log::redirect(const std::string& filename) {
             std::filesystem::create_directories(finalPath.parent_path());
         }
     }
-    if (std::filesystem::exists(finalPath)) {
-        std::string stem = finalPath.stem().string();
-        std::string extension = finalPath.extension().string();
-        finalPath = finalPath.parent_path() / (stem + "_" + timestamp + extension);
-    }
     logFile.open(finalPath, std::ios::app);
     if (!logFile) {
         throw std::runtime_error("Cannot open log file: " + finalPath.string());
     }
     std::cout.rdbuf(logFile.rdbuf());
-    logger << "Logging to file: " << finalPath << std::endl;
+    if (std::filesystem::exists(finalPath)) {
+        logger << std::endl;
+        logger << "-----------------------------------------" << std::endl;
+        logger << "Appending to existing log file: " << finalPath << std::endl;
+        logger << "Current Time: " << timestamp << std::endl;
+    } else {
+        logger << "Logging to file: " << finalPath << std::endl;
+    }
 }
 
 Log::~Log() {

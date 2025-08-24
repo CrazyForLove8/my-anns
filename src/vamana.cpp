@@ -117,7 +117,7 @@ diskann::Vamana::build_internal() {
 }
 
 void
-diskann::Vamana::partial_build(std::vector<uint32_t>& permutation) {
+diskann::Vamana::partial_build(std::vector<IdType>& permutation) {
     int n = permutation.size();
     std::mt19937 rng(2024);
     for (int u = 0; u < n; ++u) {

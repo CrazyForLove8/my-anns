@@ -5,7 +5,7 @@ using namespace graph;
 
 int seed = 2024;
 
-Node::Node(int i, float d) {
+Node::Node(IdType i, float d) {
     id = i;
     distance = d;
 }
@@ -19,7 +19,7 @@ Node::operator=(const Node& other) {
     return *this;
 }
 
-Neighbor::Neighbor(int i, float d, bool f) {
+Neighbor::Neighbor(IdType i, float d, bool f) {
     id = i;
     distance = d;
     flag = f;
@@ -39,11 +39,6 @@ Neighbor::Neighbor(const Neighbor& other) {
     id = other.id;
     distance = other.distance;
     flag = other.flag;
-}
-
-Neighborhood::Neighborhood(int s, std::mt19937& rng, int N) {
-    new_.resize(s * 2);
-    gen_random(rng, new_.data(), static_cast<int>(new_.size()), N);
 }
 
 Neighborhood&
@@ -91,7 +86,7 @@ Neighborhood::Neighborhood(const Neighborhood& other) {
 }
 
 unsigned
-Neighborhood::pushHeap(int id, float dist) {
+Neighborhood::pushHeap(IdType id, float dist) {
     std::lock_guard<std::mutex> guard(lock_);
     if (!candidates_.empty() && dist >= candidates_.front().distance)
         return 0;
@@ -111,7 +106,7 @@ Neighborhood::pushHeap(int id, float dist) {
 }
 
 void
-Neighborhood::addNeighbor(Neighbor nn, int capacity) {
+Neighborhood::addNeighbor(const Neighbor& nn, int capacity) {
     auto it = std::lower_bound(candidates_.begin(), candidates_.end(), nn);
     if (nn.distance >= greatest_distance)
         return;
@@ -180,13 +175,13 @@ FlattenHGraph::size() const {
 int
 seekPos(const Neighbors& vec) {
     int left = 0, right = vec.size() - 1;
-    if (vec.back().id > 0) {
+    if (vec.back().id != std::numeric_limits<IdType>::max()) {
         return right;
     }
     int result = left;
     while (left <= right) {
         int mid = (left + right) / 2;
-        if (vec[mid].id == -1) {
+        if (vec[mid].id == std::numeric_limits<IdType>::max()) {
             result = mid;
             right = mid - 1;
         } else {
@@ -203,7 +198,7 @@ graph::search(IndexOracle<float>* oracle,
               const float* query,
               int topk,
               int search_L,
-              int entry_id,
+              IdType entry_id,
               int K0) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
@@ -214,8 +209,10 @@ graph::search(IndexOracle<float>* oracle,
     const std::vector<int>& final_graph = fg.final_graph;
     auto total = oracle->size();
     int L = std::max(search_L, topk);
-    Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
-    if (entry_id == -1) {
+    Neighbors retset(
+        L + 1,
+        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
+    if (entry_id == std::numeric_limits<IdType>::max()) {
         std::vector<int> init_ids;
         init_ids.reserve(L);
         init_ids.resize(L);
@@ -237,7 +234,7 @@ graph::search(IndexOracle<float>* oracle,
         int nk = L;
         if (retset[k].flag) {
             retset[k].flag = false;
-            int n = retset[k].id;
+            IdType n = retset[k].id;
             int offset = offsets[n];
             int K = offsets[n + 1] - offset;
             K = K > K0 ? K0 : K;
@@ -283,15 +280,17 @@ graph::knn_search(IndexOracle<float>* oracle,
                   const float* query,
                   int topk,
                   int L,
-                  int entry_id,
+                  IdType entry_id,
                   int graph_sz) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
     auto* visit_array = visit_list->block_;
     auto visit_tag = visit_list->version_;
 
-    Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
-    if (entry_id == -1) {
+    Neighbors retset(
+        L + 1,
+        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
+    if (entry_id == std::numeric_limits<IdType>::max()) {
         if (graph_sz == -1) {
             graph_sz = graph.size();
         }
@@ -357,13 +356,15 @@ graph::search_layer(IndexOracle<float>* oracle,
                     const float* query,
                     int topk,
                     int L,
-                    int entry_id) {
+                    IdType entry_id) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
     auto* visit_array = visit_list->block_;
     auto visit_tag = visit_list->version_;
     auto& graph = hgraph[layer];
-    Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
+    Neighbors retset(
+        L + 1,
+        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
     auto dist = (*oracle)(entry_id, query);
     retset[0] = Neighbor(entry_id, dist, true);
 
@@ -411,13 +412,15 @@ graph::track_search(IndexOracle<float>* oracle,
                     Graph& graph,
                     const float* query,
                     int L,
-                    int entry_id) {
+                    IdType entry_id) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
     auto* visit_array = visit_list->block_;
     auto visit_tag = visit_list->version_;
 
-    Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
+    Neighbors retset(
+        L + 1,
+        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
     Neighbors track;
     auto dist = (*oracle)(entry_id, query);
     retset[0] = Neighbor(entry_id, dist, true);

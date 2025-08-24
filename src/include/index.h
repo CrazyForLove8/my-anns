@@ -87,12 +87,11 @@ public:
     virtual void
     build();
 
-    /**
-     * Add a dataset to the existing index. Note that data from the dataset will be appended to the existing data.
-     * @param dataset
-     */
     virtual void
     add(DatasetPtr& dataset);
+
+    virtual void
+    remove(IdType id);
 
     virtual Graph&
     extract_graph();

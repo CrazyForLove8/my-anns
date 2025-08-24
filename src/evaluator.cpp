@@ -87,15 +87,18 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             search_Ls = {
                 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600};
         } else {
-            for (int i = 20; i < 100; i += 5) {
+            for (int i = 20; i < 100; i += 10) {
                 search_Ls.push_back(i);
             }
-            for (int i = 100; i < 400; i += 10) {
+            for (int i = 100; i < 400; i += 50) {
                 search_Ls.push_back(i);
             }
-            for (int i = 400; i <= 800; i += 100) {
+            for (int i = 400; i < 1000; i += 100) {
                 search_Ls.push_back(i);
             }
+            //            for (int i = 400; i <= 800; i += 100) {
+            //                search_Ls.push_back(i);
+            //            }
         }
     } else {
         search_Ls = {search_L};
@@ -122,13 +125,13 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
 int
 seek(const Neighbors& vec) {
     int left = 0, right = vec.size() - 1;
-    if (vec.back().id > 0) {
+    if (vec.back().id != std::numeric_limits<IdType>::max()) {
         return right;
     }
     int result = left;
     while (left <= right) {
         int mid = (left + right) / 2;
-        if (vec[mid].id == -1) {
+        if (vec[mid].id == std::numeric_limits<IdType>::max()) {
             result = mid;
             right = mid - 1;
         } else {
@@ -145,13 +148,15 @@ searchWithDist(IndexOracle<float>* oracle,
                const float* query,
                int topk,
                int L,
-               int entry_id = -1) {
+               IdType entry_id = std::numeric_limits<IdType>::max()) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
     auto* visit_array = visit_list->block_;
     auto visit_tag = visit_list->version_;
-    Neighbors retset(L + 1, Neighbor(-1, std::numeric_limits<float>::max(), false));
-    if (entry_id == -1) {
+    Neighbors retset(
+        L + 1,
+        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
+    if (entry_id == std::numeric_limits<IdType>::max()) {
         std::vector<int> init_ids(L);
         std::mt19937 rng(2024);
         gen_random(rng, init_ids.data(), L, graph.size());

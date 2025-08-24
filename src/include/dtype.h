@@ -52,6 +52,8 @@
 
 namespace graph {
 
+using IdType = uint32_t;
+
 using Value = std::variant<uint64_t, double_t, std::string>;
 using ParamMap = std::unordered_map<std::string, Value>;
 

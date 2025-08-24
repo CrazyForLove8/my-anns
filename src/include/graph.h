@@ -30,12 +30,12 @@
 namespace graph {
 
 struct Node {
-    int id;
+    IdType id;
     float distance;
 
     Node() = default;
 
-    Node(int i, float d);
+    Node(IdType i, float d);
 
     inline bool
     operator<(const Node& n) const {
@@ -49,13 +49,13 @@ struct Node {
 using Nodes = std::vector<Node>;
 
 struct Neighbor {
-    int id;
+    IdType id;
     float distance;
     bool flag;
 
     Neighbor() = default;
 
-    Neighbor(int i, float d, bool f);
+    Neighbor(IdType i, float d, bool f);
 
     inline bool
     operator<(const Neighbor& n) const {
@@ -87,31 +87,29 @@ struct Neighborhood {
 
     Neighborhood() = default;
 
-    Neighborhood(int s, std::mt19937& rng, int N);
-
     Neighborhood&
     operator=(const Neighborhood& other);
 
     Neighborhood(const Neighborhood& other);
 
     /**
-             * Assure that candidates_ is already a heap with manually reserved capacity.
-             * Otherwise, this operation is invalid.
-             * @param id
-             * @param dist
-             * @return
-             */
+     * Assure that candidates_ is already a heap with manually reserved capacity.
+     * Otherwise, this operation is invalid.
+     * @param id
+     * @param dist
+     * @return
+     */
     unsigned
-    pushHeap(int id, float dist);
+    pushHeap(IdType id, float dist);
 
     /**
-             * This function add nn into sorted candidates_ within a capacity limit.
-             * A capacity of negative numbers refers to no limit.
-             * @param nn
-             * @param capacity
-             */
+     * This function add nn into sorted candidates_ within a capacity limit.
+     * A capacity of negative numbers refers to no limit.
+     * @param nn
+     * @param capacity
+     */
     void
-    addNeighbor(Neighbor nn, int capacity = -1);
+    addNeighbor(const Neighbor& nn, int capacity = -1);
 
     /**
              * @brief Move the content of the other neighborhood to this neighborhood. Note that only the candidates are moved.
@@ -176,7 +174,7 @@ gen_random(std::mt19937& rng, int* addr, int size, int N) {
 }
 
 inline int
-insert_into_pool(Neighbor* addr, int size, Neighbor nn) {
+insert_into_pool(Neighbor* addr, int size, const Neighbor& nn) {
     int left = 0, right = size - 1;
     if (addr[left].distance > nn.distance) {
         memmove((char*)&addr[left + 1], &addr[left], size * sizeof(Neighbor));
@@ -215,7 +213,7 @@ knn_search(IndexOracle<float>* oracle,
            const float* query,
            int topk,
            int L,
-           int entry_id = -1,
+           IdType entry_id = std::numeric_limits<IdType>::max(),
            int graph_sz = -1);
 
 Neighbors
@@ -226,7 +224,7 @@ search_layer(IndexOracle<float>* oracle,
              const float* query,
              int topk,
              int L,
-             int entry_id = -1);
+             IdType entry_id = std::numeric_limits<IdType>::max());
 
 Neighbors
 track_search(IndexOracle<float>* oracle,
@@ -234,7 +232,7 @@ track_search(IndexOracle<float>* oracle,
              Graph& graph,
              const float* query,
              int L,
-             int entry_id);
+             IdType entry_id = std::numeric_limits<IdType>::max());
 
 /**
      * @brief Search the graph with the given query.
@@ -254,7 +252,7 @@ search(IndexOracle<float>* oracle,
        const float* query,
        int topk,
        int search_L,
-       int entry_id = -1,
+       IdType entry_id = std::numeric_limits<IdType>::max(),
        int K0 = 128);
 
 int

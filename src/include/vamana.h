@@ -58,7 +58,7 @@ public:
     set_R(int R);
 
     void
-    partial_build(std::vector<uint32_t>& permutation);
+    partial_build(std::vector<IdType>& permutation);
 
     void
     print_info() const override;

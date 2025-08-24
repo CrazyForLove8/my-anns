@@ -24,15 +24,15 @@ protected:
 
     uint32_t max_base_neighbors_{64};
 
-    uint32_t max_level_{};
+    uint8_t max_level_{};
 
-    uint32_t cur_max_level_{};
+    uint8_t cur_max_level_{};
 
     uint32_t ef_construction_{};
 
-    uint64_t cur_size_{1};
+    IdType cur_size_{1};
 
-    std::vector<uint32_t> levels_;
+    std::vector<uint8_t> levels_;
 
     double reverse_{};
 
@@ -41,7 +41,7 @@ protected:
     std::default_random_engine random_engine_;
 
     virtual void
-    addPoint(unsigned index);
+    addPoint(IdType index);
 
     Neighbors
     searchLayer(
@@ -90,16 +90,16 @@ public:
     set_ef_construction(int ef_construction);
 
     void
-    set_cur_size(uint64_t cur_size);
+    set_cur_size(IdType cur_size);
 
     void
     build() override;
 
     void
-    partial_build(uint64_t start, uint64_t end);
+    partial_build(IdType start, IdType end);
 
     void
-    partial_build(uint64_t num = 0);
+    partial_build(IdType num = 0);
 
     Graph&
     extract_graph() override;
@@ -112,6 +112,9 @@ public:
 
     void
     add(DatasetPtr& dataset) override;
+
+    void
+    remove(graph::IdType id) override;
 
     Neighbors
     search(const float* query, unsigned int topk, unsigned int L) const override;

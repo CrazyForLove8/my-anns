@@ -6,9 +6,9 @@ using namespace hnsw;
 
 void
 testBuild() {
-    Log::redirect("16.hnsw_test");
+    //    Log::redirect("16.hnsw_test");
 
-    auto dataset = Dataset::getInstance("glove", "1m");
+    auto dataset = Dataset::getInstance("sift", "10k");
     auto index = std::make_shared<HNSW>(dataset, 32, 200);
     index->build();
     recall(index, dataset);
@@ -271,6 +271,6 @@ int
 main() {
     Log::setVerbose(true);
 
-    test_load_checkpoint();
+    testBuild();
     return 0;
 }

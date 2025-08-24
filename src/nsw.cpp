@@ -32,7 +32,7 @@ nsw::NSW::addPoint(unsigned int index) {
                           (*oracle_)[index],
                           max_neighbors_,
                           ef_construction_,
-                          -1,
+                          std::numeric_limits<IdType>::max(),
                           index);
     for (auto& re : res) {
         graph_[index].addNeighbor(re, max_neighbors_);

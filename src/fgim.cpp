@@ -162,6 +162,7 @@ FGIM::update_neighbors(Graph& graph) {
         unsigned convergence = std::lround(THRESHOLD * static_cast<float>(graph.size()) *
                                            static_cast<float>(max_base_degree_));
         connect_no_indegree(graph);
+
         if (cnt <= convergence) {
             break;
         }

@@ -1,4 +1,4 @@
-#include "shnsw.h"
+#include "hnsw/shnsw.h"
 
 shnsw::SHNSW::SHNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction, float radius)
     : HNSW(dataset, max_neighbors, ef_construction), radius_(radius) {
