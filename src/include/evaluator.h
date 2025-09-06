@@ -62,7 +62,7 @@ recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
        DatasetPtr& dataset,
        std::variant<int, std::vector<int> > search_L = -1,
        unsigned K = 10,
-       unsigned runs = 5);
+       unsigned runs = 3);
 }  // namespace graph
 
 #endif  // MYANNS_EVALUATOR_H

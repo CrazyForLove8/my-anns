@@ -52,11 +52,32 @@ test_load_checkpoint(DatasetPtr& dataset) {
     mGraph.combine(indexes);
 }
 
+void
+test_cache_friendly_update() {
+    omp_set_num_threads(20);
+    auto name = "deep";
+    std::vector<IndexPtr> indexes;
+    {
+        auto dataset = Dataset::getInstance(name, "1m");
+        Log::redirect("our_disk_" + dataset->getName());
+        auto subsets = dataset->subsets(2);
+        for (auto& subset : subsets) {
+            auto idx = std::make_shared<diskann::Vamana>(subset, 1.2, 200, 32);
+            idx->build();
+            indexes.emplace_back(idx);
+        }
+    }
+
+    auto dataset = Dataset::getInstance(name, "1m", true);
+    auto merge = std::make_shared<MGraph>(dataset, 16, 200);
+    merge->combine(indexes);
+    recall(merge, dataset, 200);
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    auto dataset = Dataset::getInstance("sift", "1m");
-    test_load_checkpoint(dataset);
+    test_cache_friendly_update();
     return 0;
 }

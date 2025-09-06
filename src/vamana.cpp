@@ -3,6 +3,8 @@
 diskann::Vamana::Vamana(DatasetPtr& dataset, float alpha, int L, int R)
     : Index(dataset), alpha_(alpha), L_(L), R_(R) {
     std::mt19937 rng(std::random_device{}());
+
+#pragma omp parallel for schedule(dynamic, 1024)
     for (auto u = 0; u < oracle_->size(); ++u) {
         std::uniform_int_distribution<IdType> distrib(0, oracle_->size() - 1);
         for (int i = 0; i < R_; ++i) {
