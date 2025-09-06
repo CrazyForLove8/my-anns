@@ -13,7 +13,7 @@
 
 namespace graph {
 
-std::vector<std::vector<unsigned int> >
+[[maybe_unused]] std::vector<std::vector<unsigned int> >
 loadGroundTruth(const std::string& filename, unsigned int qsize, unsigned int K = 100);
 
 /* Default is L2 */
@@ -34,12 +34,13 @@ private:
 
     VisitedListPoolPtr visited_list_pool_;
 
-    bool full_dataset_;
+    bool full_dataset_{false};
+    bool use_disk_{false};
 
     void
     load();
 
-    void
+    [[maybe_unused]] void
     createOracle();
 
 public:
@@ -54,7 +55,7 @@ public:
      * @return
      */
     static std::shared_ptr<Dataset>
-    getInstance(const std::string& base_path, DISTANCE metric);
+    getInstance(const std::string& base_path, DISTANCE metric, bool use_disk = false);
 
     /**
      * @brief Get the instance of the dataset
@@ -63,7 +64,7 @@ public:
      * @return
      */
     static std::shared_ptr<Dataset>
-    getInstance(const std::string& name, const std::string& size);
+    getInstance(const std::string& name, const std::string& size, bool use_disk = false);
 
     /**
      * @brief Get the instance of the dataset
@@ -76,7 +77,8 @@ public:
     getInstance(const std::string& base_path,
                 const std::string& query_path,
                 const std::string& groundtruth_path,
-                DISTANCE metric);
+                DISTANCE metric,
+                bool use_disk = false);
 
     std::string&
     getName();
@@ -84,16 +86,16 @@ public:
     std::string&
     getSize();
 
-    Matrix<float>&
+    [[nodiscard]] Matrix<float>&
     getBase() const;
 
     MatrixPtr<float>&
     getBasePtr();
 
-    Matrix<float>&
+    [[nodiscard]] Matrix<float>&
     getQuery() const;
 
-    Matrix<int>&
+    [[nodiscard]] Matrix<int>&
     getGroundTruth() const;
 
     OraclePtr&
@@ -105,9 +107,19 @@ public:
     VisitedListPoolPtr&
     getVisitedListPool();
 
+    /**
+     * Copy the dataset into num subsets.
+     * @param datasets
+     * @param num
+     */
     void
     split(std::vector<std::shared_ptr<Dataset> >& datasets, unsigned int num);
 
+    /**
+     * In-place split the dataset into num subsets.
+     * @param num
+     * @return
+     */
     [[nodiscard]] std::vector<std::shared_ptr<Dataset> >
     subsets(unsigned int num) const;
 

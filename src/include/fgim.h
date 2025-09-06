@@ -5,6 +5,7 @@
 #ifndef MYANNS_MERGE_H
 #define MYANNS_MERGE_H
 
+#include "bitset.h"
 #include "dataset.h"
 #include "dtype.h"
 #include "graph.h"

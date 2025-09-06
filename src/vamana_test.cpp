@@ -337,10 +337,47 @@ test_save() {
     recall(index, dataset);
 }
 
+void
+test_vamana_partial_build_disk() {
+    auto dataset = Dataset::getInstance("glove", "1m", true);
+    Log::redirect("vamana_partial_build_disk" + dataset->getName());
+
+    auto size = dataset->getOracle()->size();
+    auto index = std::make_shared<diskann::Vamana>(dataset, 1.2, 200, 64);
+    index->partial_build(size / 2);
+    index->partial_build(size - size / 2);
+
+    recall(index, dataset, 200);
+}
+
+void
+test_diskann_build_in_memory() {
+    print_memory_usage();
+    auto dataset = Dataset::getInstance("sift", "1m");
+    auto index = std::make_shared<diskann::DiskANN>(dataset, 1.2, 200, 32, 40, 2);
+    index->build();
+    recall(index, dataset);
+    print_memory_usage();
+}
+
+void
+test_diskann_build_with_ssd() {
+    print_memory_usage();
+    auto dataset = Dataset::getInstance("sift", "1m", true);
+    auto index = std::make_shared<diskann::DiskANN>(dataset, 1.2, 200, 32, 40, 2);
+    index->build();
+    recall(index, dataset);
+    print_memory_usage();
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    test_save();
+    test_vamana_partial_build_disk();
+    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
+    if (ret != 0) {
+        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
+    }
     return 0;
 }

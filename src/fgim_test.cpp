@@ -82,16 +82,33 @@ exp3_taumng(DatasetPtr& dataset) {
     recall(mng, dataset, 200);
 }
 
+void
+test_cache_friendly_update() {
+    omp_set_num_threads(20);
+    std::vector<IndexPtr> indexes;
+    {
+        auto dataset = Dataset::getInstance("sift", "1m");
+        Log::redirect("fgim_cache_friendly_update_" + dataset->getName());
+        auto subsets = dataset->subsets(2);
+        for (auto& subset : subsets) {
+            auto idx = std::make_shared<hnsw::HNSW>(subset, 20, 200);
+            idx->build();
+            indexes.emplace_back(idx);
+        }
+    }
+    auto dataset = Dataset::getInstance("sift", "1m", true);
+
+    omp_set_num_threads(1);
+    auto merge = std::make_shared<MGraph>(dataset, 16, 200);
+    merge->combine(indexes);
+    recall(merge, dataset, 200);
+}
+
 int
 main() {
-#if not MULTI_THREAD
-    omp_set_num_threads(1);
-#endif
     Log::setVerbose(true);
 
-    auto dataset = Dataset::getInstance("sift", "1m");
-
-    exp3_taumng(dataset);
+    test_cache_friendly_update();
 
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
     if (ret != 0) {

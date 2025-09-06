@@ -61,7 +61,7 @@ nsg::NSG::tree() {
             }
             built = false;
             auto candidates = track_search(
-                oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[i], L_, root);
+                oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[i].get(), L_, root);
             bool added = false;
             int idx = 0;
             for (auto& candidate : candidates) {
@@ -103,7 +103,7 @@ nsg::NSG::build_internal() {
         for (unsigned i = 0; i < oracle_->size(); ++i) {
             auto pt = (*oracle_)[i];
             for (unsigned j = 0; j < oracle_->dim(); ++j) {
-                center[j] += pt[j];
+                center[j] += pt.get()[j];
             }
         }
         for (unsigned i = 0; i < oracle_->dim(); ++i) {
@@ -120,8 +120,8 @@ nsg::NSG::build_internal() {
         if (u % 10000 == 0) {
             logger << "Adding " << u << " / " << graph_.size() << std::endl;
         }
-        std::vector<Neighbor> candidates =
-            track_search(oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u], L_, root);
+        std::vector<Neighbor> candidates = track_search(
+            oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u].get(), L_, root);
         candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
         candidates.erase(
             std::remove_if(

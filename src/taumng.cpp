@@ -81,7 +81,7 @@ taumng::TauMNG::build_internal() {
             logger << "Processing " << u << " / " << graph_.size() << std::endl;
         }
         auto H_u_ =
-            knn_search(oracle_.get(), visited_list_pool_.get(), base_, (*oracle_)[u], h_, b_);
+            knn_search(oracle_.get(), visited_list_pool_.get(), base_, (*oracle_)[u].get(), h_, b_);
         Neighbors candidates;
         for (auto& v : H_u_) {
             if (u == v.id) {

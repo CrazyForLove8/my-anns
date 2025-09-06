@@ -96,3 +96,7 @@ Log::~Log() {
         logFile.close();
     }
 }
+Log&
+Log::operator<<(uint8_t v) {
+    return (*this) << static_cast<unsigned int>(v);
+}

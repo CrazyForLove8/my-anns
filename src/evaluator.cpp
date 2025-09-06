@@ -22,8 +22,8 @@ calRecall(
 #pragma omp parallel for reduction(+ : local_recall)
 #endif
         for (size_t i = 0; i < qsize; ++i) {
-            auto result = index.search(query[i], K, L);
-            std::unordered_set<unsigned> gt(groundTruth[i], groundTruth[i] + K);
+            auto result = index.search(query[i].get(), K, L);
+            std::unordered_set<unsigned> gt(groundTruth[i].get(), groundTruth[i].get() + K);
             size_t correct = 0;
             for (const auto& res : result) {
                 if (gt.find(res.id) != gt.end()) {
@@ -58,8 +58,8 @@ calRecall(const IndexPtr& index,
 #pragma omp parallel for reduction(+ : local_recall)
 #endif
         for (size_t i = 0; i < qsize; ++i) {
-            auto result = index->search(query[i], K, L);
-            std::unordered_set<unsigned> gt(groundTruth[i], groundTruth[i] + K);
+            auto result = index->search(query[i].get(), K, L);
+            std::unordered_set<unsigned> gt(groundTruth[i].get(), groundTruth[i].get() + K);
             size_t correct = 0;
             for (const auto& res : result) {
                 if (gt.find(res.id) != gt.end()) {
@@ -78,11 +78,18 @@ calRecall(const IndexPtr& index,
 void
 graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
               DatasetPtr& dataset,
-              int search_L,
+              std::variant<int, std::vector<int> > search_L,
               unsigned K,
               unsigned runs) {
     std::vector<int> search_Ls;
-    if (search_L < 0) {
+    if (std::holds_alternative<std::vector<int> >(search_L)) {
+        search_Ls = std::get<std::vector<int> >(search_L);
+    } else if (std::holds_alternative<int>(search_L) && std::get<int>(search_L) < 0) {
+        search_Ls = {};
+    } else if (std::holds_alternative<int>(search_L)) {
+        search_Ls = {std::get<int>(search_L)};
+    }
+    if (search_Ls.empty()) {
         if (K == 100) {
             search_Ls = {
                 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600};
@@ -100,8 +107,6 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             //                search_Ls.push_back(i);
             //            }
         }
-    } else {
-        search_Ls = {search_L};
     }
 
     size_t qsize = dataset->getQuery().size();
@@ -266,10 +271,10 @@ calDist(const IndexPtr& index,
                 auto result = searchWithDist(dataset->getOracle().get(),
                                              dataset->getVisitedListPool().get(),
                                              index->extract_graph(),
-                                             query[i],
+                                             query[i].get(),
                                              K,
                                              L);
-                std::unordered_set<unsigned> gt(groundTruth[i], groundTruth[i] + K);
+                std::unordered_set<unsigned> gt(groundTruth[i].get(), groundTruth[i].get() + K);
                 size_t correct = 0;
                 for (const auto& res : result.first) {
                     if (gt.find(res.id) != gt.end()) {
@@ -296,8 +301,8 @@ calDist(const IndexPtr& index,
 #pragma omp parallel for reduction(+ : local_recall)
 #endif
         for (size_t i = 0; i < qsize; ++i) {
-            auto result = search(hgraph, dataset, query[i], K, L, enter_point);
-            std::unordered_set<unsigned> gt(groundTruth[i], groundTruth[i] + K);
+            auto result = search(hgraph, dataset, query[i].get(), K, L, enter_point);
+            std::unordered_set<unsigned> gt(groundTruth[i].get(), groundTruth[i].get() + K);
             size_t correct = 0;
             for (const auto& res : result.first) {
                 if (gt.find(res.id) != gt.end()) {

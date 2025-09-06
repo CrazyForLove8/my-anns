@@ -141,6 +141,44 @@ Index::remove(IdType id) {
     throw std::runtime_error("Index does not support remove operation");
 }
 
+void
+Index::partial_build(IdType start, IdType end) {
+    throw std::runtime_error("Index does not support partial build");
+}
+
+void
+Index::partial_build(IdType num) {
+    print_info();
+    if (built_) {
+        logger << "Index is already built, skipping build." << std::endl;
+        return;
+    }
+    auto start = cur_size_;
+    auto end = cur_size_ == 1 ? num : cur_size_ + num;
+    if (end > oracle_->size()) {
+        num = oracle_->size() - start;
+        end = oracle_->size();
+    }
+
+    Timer timer;
+    timer.start();
+    this->partial_build(start, end);
+    timer.end();
+
+    cur_size_ += num;
+    if (cur_size_ == oracle_->size()) {
+        logger << "Partial build completed, total size: " << cur_size_ << std::endl;
+        flatten_graph_ = FlattenGraph(graph_);
+        built_ = true;
+        logger << "Index built successfully." << std::endl;
+    } else {
+        logger << "Partial build completed, total size: " << cur_size_
+               << ", but not all points are added yet." << std::endl;
+        built_ = false;
+    }
+    logger << "Partial build consumed " << timer.elapsed() << " s." << std::endl;
+}
+
 IndexWrapper::IndexWrapper(DatasetPtr& dataset, Graph& graph) {
     dataset_ = dataset;
     oracle_ = dataset->getOracle();

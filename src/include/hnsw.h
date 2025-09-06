@@ -30,8 +30,6 @@ protected:
 
     uint32_t ef_construction_{};
 
-    IdType cur_size_{1};
-
     std::vector<uint8_t> levels_;
 
     double reverse_{};
@@ -68,6 +66,9 @@ protected:
     void
     build_internal() override;
 
+    void
+    partial_build(IdType start, IdType end) override;
+
 public:
     uint32_t enter_point_{};
 
@@ -96,10 +97,7 @@ public:
     build() override;
 
     void
-    partial_build(IdType start, IdType end);
-
-    void
-    partial_build(IdType num = 0);
+    partial_build(IdType num) override;
 
     Graph&
     extract_graph() override;

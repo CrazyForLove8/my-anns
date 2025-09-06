@@ -2,8 +2,8 @@
 
 void
 testKMeans() {
-    auto dataset = Dataset::getInstance("sift", "10k");
-    auto kmeans = std::make_shared<Kmeans>(dataset, 10);
+    auto dataset = Dataset::getInstance("sift", "100k");
+    auto kmeans = std::make_shared<Kmeans>(dataset, 4);
     kmeans->Run();
 
     std::cout << "1 Center of 0: " << kmeans->NearestCenter(0, 1)[0] << std::endl;

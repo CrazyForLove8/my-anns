@@ -12,7 +12,7 @@ shnsw::SHNSW::addPoint(unsigned int index) {
 
     unsigned cur_node_ = enter_point_;
     for (auto i = cur_max_level_; i > level; --i) {
-        auto res = searchLayer(graph_[i], (*oracle_)[index], 1, 1, cur_node_);
+        auto res = searchLayer(graph_[i], (*oracle_)[index].get(), 1, 1, cur_node_);
         cur_node_ = res[0].id;
     }
 
@@ -21,8 +21,8 @@ shnsw::SHNSW::addPoint(unsigned int index) {
 
     for (auto i = std::min(level, cur_max_level_); i >= 0; --i) {
         Graph& graph = graph_[i];
-        auto res =
-            searchLayer(graph, (*oracle_)[index], ef_construction_, ef_construction_, cur_node_);
+        auto res = searchLayer(
+            graph, (*oracle_)[index].get(), ef_construction_, ef_construction_, cur_node_);
         auto pos = seekPos(res);
         resset.emplace_back(res.begin(), res.begin() + pos);
         cur_node_ = res[0].id;

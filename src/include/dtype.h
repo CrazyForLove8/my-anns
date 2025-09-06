@@ -24,6 +24,7 @@
 #include <variant>
 #include <vector>
 
+#include "file.h"
 #include "logger.h"
 
 #ifdef __GNUC__
@@ -59,69 +60,103 @@ using ParamMap = std::unordered_map<std::string, Value>;
 
 template <typename T>
 class Matrix {
-    unsigned col{};
-    unsigned row{};
-    size_t stride{};
+    unsigned col_{};
+    unsigned row_{};
+    size_t stride_{};
+    size_t offset_bytes_{};
 
     std::shared_ptr<char> data;
 
-    size_t offset_bytes{};
+    bool use_disk_{false};
+    FileReaderParams fin_params_;
 
     void
     reset(const unsigned r, const unsigned c) {
-        row = r;
-        col = c;
-        stride = (sizeof(T) * c + ALIGNMENT - 1) / ALIGNMENT * ALIGNMENT;
-        auto new_data_ptr = static_cast<char*>(memalign(ALIGNMENT, row * stride));
-        if (!new_data_ptr) {
-            throw std::bad_alloc();
-        }
+        row_ = r;
+        col_ = c;
+        stride_ = (sizeof(T) * c + ALIGNMENT - 1) / ALIGNMENT * ALIGNMENT;
         if (data) {
             data.reset();
+            data = nullptr;
         }
-        data = std::shared_ptr<char>(new_data_ptr, [](char* p) { free(p); });
+        if (use_disk_) {
+            return;
+        }
+        auto deleter = [](char* p) { free(p); };
+        std::unique_ptr<char, decltype(deleter)> uptr(
+            static_cast<char*>(memalign(ALIGNMENT, row_ * stride_)), deleter);
+        if (!uptr) {
+            throw std::bad_alloc();
+        }
+        data = std::shared_ptr<char>(std::move(uptr));
     }
 
     void
-    load_vecs_data(std::ifstream& is, const unsigned int skip, const unsigned int gap) {
+    load_vecs_data(const std::string& path) {
+        std::ifstream is(path.c_str(), std::ios::binary);
+        if (!is) {
+            throw std::runtime_error("Cannot open file " + path);
+        }
         is.seekg(0, std::ios::end);
         size_t size = is.tellg();
-        size -= skip;
         is.seekg(0, std::ios::beg);
         unsigned dim;
         is.read(reinterpret_cast<char*>(&dim), sizeof(unsigned int));
-        unsigned line = sizeof(T) * dim + gap;
+        is.seekg(0, std::ios::beg);
+        unsigned line = sizeof(T) * dim + 4;
         unsigned N = size / line;
         logger << "Vector size: " << N << std::endl;
         logger << "Vector dimension: " << dim << std::endl;
         reset(N, dim);
-        zero();
-        is.seekg(skip, std::ios::beg);
-        for (unsigned i = 0; i < N; ++i) {
-            is.seekg(gap, std::ios::cur);
-            is.read(data.get() + stride * i, sizeof(T) * dim);
+        if (!use_disk_) {
+            zero();
+            for (unsigned i = 0; i < N; ++i) {
+                is.seekg(sizeof(unsigned int), std::ios::cur);
+                is.read(data.get() + stride_ * i, sizeof(T) * dim);
+            }
+            is.close();
+        } else {
+            fin_params_.data_path = path;
+            fin_params_.each_offset = sizeof(unsigned int);
         }
     }
 
     void
-    load_bin_data(std::ifstream& is) {
+    load_bin_data(const std::string& path) {
+        std::ifstream is(path.c_str(), std::ios::binary);
+        if (!is) {
+            throw std::runtime_error("Cannot open file " + path);
+        }
+
         unsigned size, dim;
         is.read(reinterpret_cast<char*>(&size), sizeof(unsigned int));
         is.read(reinterpret_cast<char*>(&dim), sizeof(unsigned int));
         logger << "Vector size: " << size << std::endl;
         logger << "Vector dimension: " << dim << std::endl;
         reset(size, dim);
-        zero();
-        for (unsigned i = 0; i < size; ++i) {
-            is.read(data.get() + stride * i, sizeof(T) * dim);
+        if (!use_disk_) {
+            zero();
+            for (unsigned i = 0; i < size; ++i) {
+                is.read(data.get() + stride_ * i, sizeof(T) * dim);
+            }
+        } else {
+            fin_params_.data_path = path;
+            fin_params_.begin_offset = 2 * sizeof(unsigned int);
         }
+        is.close();
     }
 
     void
-    load_hdf5_data(std::ifstream& is) {
+    load_hdf5_data(const std::string& path) {
+        std::ifstream is(path.c_str(), std::ios::binary);
+        if (!is) {
+            throw std::runtime_error("Cannot open file " + path);
+        }
+
         if (is.is_open()) {
             logger << "Loading data from HDF5 file is not implemented." << std::endl;
         }
+        is.close();
     }
 
 public:
@@ -134,37 +169,40 @@ public:
     }
 
     Matrix(const Matrix& m) {
-        col = m.col, row = m.row, stride = m.stride, data = m.data;
+        col_ = m.col_, row_ = m.row_, stride_ = m.stride_, data = m.data;
     }
 
     Matrix(const Matrix& original_matrix, unsigned start_row, unsigned num_rows)
-        : col(original_matrix.col),
-          row(num_rows),
-          stride(original_matrix.stride),
+        : use_disk_(original_matrix.use_disk_),
+          col_(original_matrix.col_),
+          row_(num_rows),
+          stride_(original_matrix.stride_),
           data(original_matrix.data) {
-        offset_bytes = original_matrix.offset_bytes + start_row * original_matrix.stride;
-        if (start_row + num_rows > original_matrix.row) {
+        offset_bytes_ = original_matrix.offset_bytes_ + start_row * original_matrix.stride_;
+        fin_params_ = original_matrix.fin_params_;
+        fin_params_.begin_offset += offset_bytes_;
+        if (start_row + num_rows > original_matrix.row_) {
             throw std::out_of_range("Sub-matrix dimensions out of bounds of original matrix.");
         }
     }
 
     explicit Matrix(std::vector<std::shared_ptr<Matrix> >& matrices) {
         auto& base = matrices[0];
-        col = base->col;
-        stride = base->stride;
-        row = 0;
+        col_ = base->col_;
+        stride_ = base->stride_;
+        row_ = 0;
         for (const auto& matrix : matrices) {
-            row += matrix->row;
+            row_ += matrix->row_;
         }
-        data = std::shared_ptr<char>(static_cast<char*>(memalign(ALIGNMENT, row * stride)),
+        data = std::shared_ptr<char>(static_cast<char*>(memalign(ALIGNMENT, row_ * stride_)),
                                      [](char* p) { free(p); });
         if (data == nullptr) {
             throw std::runtime_error("Cannot allocate memory for matrix.");
         }
         size_t offset = 0;
         for (const auto& matrix : matrices) {
-            memcpy(data.get() + offset, matrix->data.get(), matrix->row * stride);
-            offset += matrix->row * stride;
+            memcpy(data.get() + offset, matrix->data.get(), matrix->row_ * stride_);
+            offset += matrix->row_ * stride_;
         }
     }
 
@@ -175,27 +213,32 @@ public:
 
     [[nodiscard]] bool
     empty() const {
-        return data == nullptr;
+        return row_ == 0 || col_ == 0;
     }
 
     [[nodiscard]] unsigned
     size() const {
-        return row;
+        return row_;
     }
 
     [[nodiscard]] unsigned
     dim() const {
-        return col;
+        return col_;
     }
 
     [[nodiscard]] size_t
     step() const {
-        return stride;
+        return stride_;
     }
 
     [[nodiscard]] size_t
     offset() const {
-        return offset_bytes;
+        return offset_bytes_;
+    }
+
+    [[nodiscard]] bool
+    is_use_disk() const {
+        return use_disk_;
     }
 
     void
@@ -208,19 +251,29 @@ public:
         return data.get() == m.data.get();
     }
 
-    T*
+    std::shared_ptr<T>
     operator[](unsigned i) {
-        return reinterpret_cast<T*>(data.get() + stride * i + offset_bytes);
+        if (use_disk_) {
+            thread_local std::unique_ptr<FileReader<T> > thread_fin;
+            if (!thread_fin) {
+                thread_fin = std::make_unique<FileReader<T> >(fin_params_, col_);
+            }
+            return thread_fin->read(i);
+        }
+        return std::shared_ptr<T>(data,
+                                  reinterpret_cast<T*>(data.get() + stride_ * i + offset_bytes_));
     }
 
-    T const*
-    operator[](unsigned i) const {
-        return reinterpret_cast<T const*>(data.get() + stride * i + offset_bytes);
-    }
-
-    T&
-    operator()(unsigned i, unsigned j) {
-        return reinterpret_cast<T*>(data.get() + stride * i + offset_bytes)[j];
+    T
+    operator()(unsigned i, unsigned j) const {
+        if (use_disk_) {
+            thread_local std::unique_ptr<FileReader<T> > thread_fin;
+            if (!thread_fin) {
+                thread_fin = std::make_unique<FileReader<T> >(fin_params_, col_);
+            }
+            return thread_fin->read(i).get()[j];
+        }
+        return reinterpret_cast<T*>(data.get() + stride_ * i + offset_bytes_)[j];
     }
 
     Matrix&
@@ -228,44 +281,41 @@ public:
         if (this == &m) {
             return *this;
         }
-        if (row * col != m.row * m.col) {
+        if (row_ * col_ != m.row_ * m.col_) {
             if (data) {
                 data.reset();
             }
-            data = std::shared_ptr<char>(static_cast<char*>(memalign(ALIGNMENT, m.row * m.stride)),
-                                         [](char* p) { free(p); });
+            data =
+                std::shared_ptr<char>(static_cast<char*>(memalign(ALIGNMENT, m.row_ * m.stride_)),
+                                      [](char* p) { free(p); });
         }
-        memcpy(data.get(), m.data.get(), m.row * m.stride);
-        row = m.row;
-        col = m.col;
-        stride = m.stride;
+        memcpy(data.get(), m.data.get(), m.row_ * m.stride_);
+        row_ = m.row_;
+        col_ = m.col_;
+        stride_ = m.stride_;
         return *this;
     }
 
     void
     zero() const {
-        memset(data.get(), 0, row * stride);
+        memset(data.get(), 0, row_ * stride_);
     }
 
     void
-    load(const std::string& path) {
+    load(const std::string& path, bool use_disk = false) {
+        use_disk_ = use_disk;
         logger << "Loading data from " << path << std::endl;
-        std::ifstream is(path.c_str(), std::ios::binary);
-        if (!is) {
-            throw std::runtime_error("Cannot open file " + path);
-        }
 
         if (path.find(".fbin") != std::string::npos || path.find(".ibin") != std::string::npos) {
-            load_bin_data(is);
+            load_bin_data(path);
         } else if (path.find(".fvecs") != std::string::npos ||
                    path.find(".ivecs") != std::string::npos) {
-            load_vecs_data(is, 0, 4);
+            load_vecs_data(path);
         } else if (path.find(".hdf5") != std::string::npos) {
-            load_hdf5_data(is);
+            load_hdf5_data(path);
         } else {
             throw std::runtime_error("Unsupported file format: " + path);
         }
-        is.close();
     }
 
     /**
@@ -274,21 +324,21 @@ public:
      */
     void
     append(const Matrix& matrix) {
-        size_t new_rows = row + matrix.row;
-        size_t new_columns = col;
+        size_t new_rows = row_ + matrix.row_;
+        size_t new_columns = col_;
         size_t new_stride = (sizeof(T) * new_columns + 31) / 32 * 32;
-        auto new_data = std::make_shared<char>(
+        auto new_data = std::shared_ptr<char>(
             static_cast<char*>(memalign(32, new_rows * new_stride)), [](char* p) { free(p); });
         if (!new_data) {
             throw std::bad_alloc();
         }
-        memcpy(new_data.get(), data.get(), row * stride);
-        memcpy(new_data.get() + row * stride, matrix.data.get(), matrix.row * matrix.step());
+        memcpy(new_data.get(), data.get(), row_ * stride_);
+        memcpy(new_data.get() + row_ * stride_, matrix.data.get(), matrix.row_ * matrix.step());
         data.reset();
         data = new_data;
-        row = new_rows;
-        col = new_columns;
-        stride = new_stride;
+        row_ = new_rows;
+        col_ = new_columns;
+        stride_ = new_stride;
     }
 
     /**
@@ -297,24 +347,24 @@ public:
      */
     void
     append(const std::vector<Matrix>& matrices) {
-        size_t new_rows = row;
+        size_t new_rows = row_;
         for (const auto& matrix : matrices) {
-            new_rows += matrix.row;
+            new_rows += matrix.row_;
         }
-        auto new_data = std::make_shared<char>(static_cast<char*>(memalign(32, new_rows * stride)),
+        auto new_data = std::make_shared<char>(static_cast<char*>(memalign(32, new_rows * stride_)),
                                                [](char* p) { free(p); });
         if (!new_data) {
             throw std::bad_alloc();
         }
-        memcpy(new_data.get(), data.get(), row * stride);
-        size_t offset = row * stride;
+        memcpy(new_data.get(), data.get(), row_ * stride_);
+        size_t offset = row_ * stride_;
         for (const auto& matrix : matrices) {
-            memcpy(new_data.get() + offset, matrix.data.get(), matrix.row * matrix.stride);
-            offset += matrix.row * matrix.stride;
+            memcpy(new_data.get() + offset, matrix.data.get(), matrix.row_ * matrix.stride_);
+            offset += matrix.row_ * matrix.stride_;
         }
         data.reset();
         data = new_data;
-        row = new_rows;
+        row_ = new_rows;
     }
 
     /**
@@ -323,24 +373,24 @@ public:
      */
     void
     append(const std::vector<std::shared_ptr<Matrix> >& matrices) {
-        size_t new_rows = row;
+        size_t new_rows = row_;
         for (const auto& matrix : matrices) {
-            new_rows += matrix->row;
+            new_rows += matrix->row_;
         }
-        auto new_data = std::shared_ptr<char>(static_cast<char*>(memalign(32, new_rows * stride)),
+        auto new_data = std::shared_ptr<char>(static_cast<char*>(memalign(32, new_rows * stride_)),
                                               [](char* p) { free(p); });
         if (!new_data) {
             throw std::bad_alloc();
         }
-        memcpy(new_data.get(), data.get(), row * stride);
-        size_t offset = row * stride;
+        memcpy(new_data.get(), data.get(), row_ * stride_);
+        size_t offset = row_ * stride_;
         for (const auto& matrix : matrices) {
-            memcpy(new_data.get() + offset, matrix->data.get(), matrix->row * matrix->stride);
-            offset += matrix->row * matrix->step();
+            memcpy(new_data.get() + offset, matrix->data.get(), matrix->row_ * matrix->stride_);
+            offset += matrix->row_ * matrix->step();
         }
         data.reset();
         data = new_data;
-        row = new_rows;
+        row_ = new_rows;
     }
 
     /**
@@ -350,9 +400,9 @@ public:
      */
     std::vector<Matrix>
     split(const size_t num) {
-        size_t new_rows = row / num;
-        size_t remaining = row % num;
-        size_t new_columns = col;
+        size_t new_rows = row_ / num;
+        size_t remaining = row_ % num;
+        size_t new_columns = col_;
         size_t new_stride = (sizeof(T) * new_columns + 31) / 32 * 32;
         std::vector<Matrix> matrices;
         for (size_t i = 1; i < num - 1; ++i) {
@@ -367,148 +417,39 @@ public:
                (new_rows + remaining) * new_stride);
         matrices.push_back(std::move(last_part));
 
-        row = new_rows;
+        row_ = new_rows;
         return matrices;
     }
 
     void
     halve(Matrix& other) {
-        size_t total = row;
-        size_t new_rows = row / 2;
-        row = new_rows;
-        auto tmp = std::shared_ptr<char>(static_cast<char*>(memalign(32, new_rows * stride)),
+        size_t total = row_;
+        size_t new_rows = row_ / 2;
+        row_ = new_rows;
+        auto tmp = std::shared_ptr<char>(static_cast<char*>(memalign(32, new_rows * stride_)),
                                          [](char* p) { free(p); });
         if (!tmp) {
             throw std::bad_alloc();
         }
-        memcpy(tmp.get(), data.get(), new_rows * stride);
+        memcpy(tmp.get(), data.get(), new_rows * stride_);
         auto new_data =
-            std::shared_ptr<char>(static_cast<char*>(memalign(32, (total - new_rows) * stride)),
+            std::shared_ptr<char>(static_cast<char*>(memalign(32, (total - new_rows) * stride_)),
                                   [](char* p) { free(p); });
         if (!new_data) {
             throw std::bad_alloc();
         }
-        memcpy(new_data.get(), data.get() + new_rows * stride, (total - new_rows) * stride);
+        memcpy(new_data.get(), data.get() + new_rows * stride_, (total - new_rows) * stride_);
         data.reset();
         data = tmp;
         other.data = new_data;
-        other.row = total - new_rows;
-        other.col = col;
-        other.stride = stride;
+        other.row_ = total - new_rows;
+        other.col_ = col_;
+        other.stride_ = stride_;
     }
 };
 
 template <typename T>
 using MatrixPtr = std::shared_ptr<Matrix<T> >;
-
-template <typename T>
-void
-mergeMatrix(const Matrix<T>& m1, const Matrix<T>& m2, Matrix<T>& merged) {
-    size_t r1 = m1.size();
-    size_t r2 = m2.size();
-    size_t c = m1.dim();
-    if (c != m2.dim()) {
-        throw std::runtime_error("Dimension mismatch");
-    }
-
-    if (&m1 == &merged) {
-        Matrix<T> temp(m1);
-        merged.resize(r1 + r2, c);
-        for (size_t i = 0; i < r1; ++i) {
-            std::copy(temp[i], temp[i] + c, merged[i]);
-        }
-    } else {
-        merged.resize(r1 + r2, c);
-        for (size_t i = 0; i < r1; ++i) {
-            std::copy(m1[i], m1[i] + c, merged[i]);
-        }
-    }
-    for (size_t i = 0; i < r2; ++i) {
-        std::copy(m2[i], m2[i] + c, merged[i + r1]);
-    }
-}
-
-template <typename T>
-class MatrixProxy {
-    unsigned rows{0};
-    unsigned cols{0};
-    size_t stride{0};
-    uint8_t const* data{nullptr};
-
-public:
-    explicit MatrixProxy(Matrix<T> const& m) {
-        reset(m);
-    }
-
-    void
-    reset(Matrix<T> const& m) {
-        rows = m.size();
-        cols = m.dim();
-        stride = m.step();
-        data = reinterpret_cast<uint8_t const*>(m[0]);
-    }
-
-#ifndef __AVX__
-#ifdef FLANN_DATASET_H_
-    /// Construct from FLANN matrix.
-    MatrixProxy(flann::Matrix<float> const& m_)
-        : rows(m_.rows), cols(m_.cols), stride(m_.stride), data(m_.data) {
-        if (stride % ALIGNMENT)
-            throw invalid_argument("bad alignment");
-    }
-#endif
-#ifdef CV_MAJOR_VERSION
-    /// Construct from OpenCV matrix.
-    MatrixProxy(cv::Mat const& m_) : rows(m_.rows), cols(m_.cols), stride(m_.step), data(m_.data) {
-        if (stride % ALIGNMENT)
-            throw invalid_argument("bad alignment");
-    }
-#endif
-#ifdef NPY_NDARRAYOBJECT_H
-    /// Construct from NumPy matrix.
-    MatrixProxy(PyArrayObject* obj) {
-        if (!obj || (obj->nd != 2))
-            throw invalid_argument("bad array shape");
-        rows = obj->dimensions[0];
-        cols = obj->dimensions[1];
-        stride = obj->strides[0];
-        data = reinterpret_cast<uint8_t const*>(obj->data);
-        if (obj->descr->elsize != sizeof(float))
-            throw invalid_argument("bad data type size");
-        if (stride % ALIGNMENT)
-            throw invalid_argument("bad alignment");
-        if (!(stride >= cols * sizeof(float)))
-            throw invalid_argument("bad stride");
-    }
-#endif
-#endif
-
-    [[nodiscard]] unsigned
-    size() const {
-        return rows;
-    }
-
-    [[nodiscard]] unsigned
-    dim() const {
-        return cols;
-    }
-
-    T const*
-    operator[](const unsigned i) const {
-#ifdef USE_SSE
-        _mm_prefetch(data + stride * i, _MM_HINT_T0);
-#endif
-        return reinterpret_cast<T const*>(data + stride * i);
-    }
-
-    T*
-    operator[](unsigned i) {
-#ifdef USE_SSE
-        _mm_prefetch(data + stride * i, _MM_HINT_T0);
-#endif
-        return const_cast<float*>(reinterpret_cast<T const*>(data + stride * i));
-    }
-};
 
 template <typename T>
 class IndexOracle {
@@ -520,7 +461,7 @@ public:
     dim() const = 0;
 
     virtual void
-    reset(const Matrix<T>& m) = 0;
+    reset(const MatrixPtr<T>& ptr) = 0;
 
     virtual T
     operator()(unsigned i, unsigned j) const = 0;
@@ -531,7 +472,7 @@ public:
     virtual T
     operator()(const T*, const T*) const = 0;
 
-    virtual T*
+    virtual std::shared_ptr<T>
     operator[](unsigned i) const = 0;
 
     virtual ~IndexOracle() = default;
@@ -542,49 +483,52 @@ using OraclePtr = std::shared_ptr<IndexOracle<float> >;
 template <typename T, typename DIST_TYPE>
 class MatrixOracle : public IndexOracle<T> {
 public:
-    MatrixProxy<T> proxy;
+    MatrixPtr<T> matrix_;
 
-    explicit MatrixOracle(const Matrix<T>& m) : proxy(m) {
+    explicit MatrixOracle(const MatrixPtr<T> ptr) : matrix_(ptr) {
+        if (!matrix_) {
+            throw std::runtime_error("Matrix pointer is null");
+        }
     }
 
     void
-    reset(const Matrix<T>& m) override {
-        proxy.reset(m);
+    reset(const MatrixPtr<T>& ptr) override {
+        matrix_ = ptr;
     }
 
     [[nodiscard]] unsigned
     size() const override {
-        return proxy.size();
+        return matrix_->size();
     }
 
     [[nodiscard]] unsigned
     dim() const override {
-        return proxy.dim();
+        return matrix_->dim();
     }
 
     T
     operator()(unsigned i, unsigned j) const override {
-        return DIST_TYPE::apply(proxy[i], proxy[j], proxy.dim());
+        return DIST_TYPE::apply((*matrix_)[i].get(), (*matrix_)[j].get(), matrix_->dim());
     }
 
     T
     operator()(unsigned i, const T* vec) const override {
-        return DIST_TYPE::apply((T*)proxy[i], vec, proxy.dim());
+        return DIST_TYPE::apply(vec, (*matrix_)[i].get(), matrix_->dim());
     }
 
     T
     operator()(const T* vec1, const T* vec2) const override {
-        return DIST_TYPE::apply(vec1, vec2, proxy.dim());
+        return DIST_TYPE::apply(vec1, vec2, matrix_->dim());
     }
 
-    T*
+    std::shared_ptr<T>
     operator[](unsigned i) const override {
-        return const_cast<T*>(proxy[i]);
+        return (*matrix_)[i];
     }
 
     static std::shared_ptr<IndexOracle<T> >
-    getInstance(const Matrix<T>& m) {
-        return std::make_shared<MatrixOracle<T, DIST_TYPE> >(m);
+    getInstance(const MatrixPtr<T> ptr) {
+        return std::make_shared<MatrixOracle<T, DIST_TYPE> >(ptr);
     }
 };
 }  // namespace graph

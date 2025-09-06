@@ -30,21 +30,25 @@ private:
        */
     int R_;
 
+    IdType root;
+
     void
-    RobustPrune(float alpha, int point, Neighbors& candidates);
+    RobustPrune(float alpha, IdType point, Neighbors& candidates);
 
     void
     build_internal() override;
 
 public:
     /**
-             *
-             * @param dataset
-             * @param alpha
-             * @param L
-             * @param R
-             */
+     *
+     * @param dataset
+     * @param alpha
+     * @param L
+     * @param R
+     */
     Vamana(DatasetPtr& dataset, float alpha, int L, int R);
+
+    Vamana(DatasetPtr& dataset, std::vector<IdType>& permutation, float alpha, int L, int R);
 
     ~Vamana() override = default;
 
@@ -56,6 +60,12 @@ public:
 
     void
     set_R(int R);
+
+    void
+    partial_build(graph::IdType start, graph::IdType end) override;
+
+    void
+    partial_build(graph::IdType num) override;
 
     void
     partial_build(std::vector<IdType>& permutation);

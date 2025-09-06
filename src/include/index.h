@@ -62,16 +62,22 @@ protected:
 
     FlattenGraph flatten_graph_;
 
-    bool built_;
+    IdType cur_size_{0};
+
+    bool built_{false};
 
     SaveHelper save_helper_;
 
     virtual void
     build_internal();
 
+    virtual void
+    partial_build(IdType start, IdType end);
+
 public:
     Index();
 
+    // TODO In the future, we shall store the original vectors in the index
     explicit Index(DatasetPtr& dataset, bool allocate = true);
 
     explicit Index(DatasetPtr& dataset, Graph& graph);
@@ -89,6 +95,9 @@ public:
 
     virtual void
     add(DatasetPtr& dataset);
+
+    virtual void
+    partial_build(IdType num);
 
     virtual void
     remove(IdType id);

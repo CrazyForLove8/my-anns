@@ -100,7 +100,7 @@ hnsw_add(DatasetPtr& dataset,
     hnsw->load_params(params);
     hnsw->set_save_helper({5, checkpoint_file});
     omp_set_num_threads(num_threads);
-    hnsw->partial_build();
+    hnsw->partial_build(0);
 
     saveHGraph(hnsw->extract_hgraph(), output_file, hnsw->extract_params());
 

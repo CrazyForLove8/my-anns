@@ -63,95 +63,228 @@ FGIM::load_latest(Graph& graph, const std::filesystem::path& directoryPath) {
     }
 }
 
+// Original version
+//void
+//FGIM::update_neighbors(Graph& graph) {
+//    size_t it = start_iter_;
+//    unsigned samples = sample_rate_ * max_base_degree_;
+//    do {
+//        int cnt = 0;
+//#pragma omp parallel
+//        {
+//            std::mt19937 rng(2024 + omp_get_thread_num());
+//            std::vector<int> _old, _new;
+//            _old.reserve(max_base_degree_ * 2);
+//            _new.reserve(max_base_degree_ * 2);
+//#pragma omp for reduction(+ : cnt) schedule(dynamic, 256)
+//            for (int vv = 0; vv < graph.size(); ++vv) {
+//                auto& v = graph[vv];
+//                _old.clear();
+//                _new.clear();
+//                for (auto& u : v.candidates_) {
+//                    if (u.flag) {
+//                        _new.emplace_back(u.id);
+//                        {
+//                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+//                            graph[u.id].reverse_new_.emplace_back(vv);
+//                        }
+//                        u.flag = false;
+//                    } else {
+//                        _old.emplace_back(u.id);
+//                        {
+//                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+//                            graph[u.id].reverse_old_.emplace_back(vv);
+//                        }
+//                    }
+//                }
+//
+//                {
+//                    std::lock_guard<std::mutex> guard(v.lock_);
+//                    if (!v.reverse_old_.empty()) {
+//                        _old.insert(_old.end(),
+//                                    std::make_move_iterator(v.reverse_old_.begin()),
+//                                    std::make_move_iterator(v.reverse_old_.end()));
+//                        v.reverse_old_.clear();
+//                    }
+//                    if (!v.reverse_new_.empty()) {
+//                        _new.insert(_new.end(),
+//                                    std::make_move_iterator(v.reverse_new_.begin()),
+//                                    std::make_move_iterator(v.reverse_new_.end()));
+//                        v.reverse_new_.clear();
+//                    }
+//                }
+//
+//                std::shuffle(_old.begin(), _old.end(), rng);
+//                if (_old.size() > samples) {
+//                    _old.resize(samples);
+//                }
+//                std::shuffle(_new.begin(), _new.end(), rng);
+//                if (_new.size() > samples) {
+//                    _new.resize(samples);
+//                }
+//
+//                auto _new_size = _new.size();
+//                auto _old_size = _old.size();
+//                for (size_t i = 0; i < _new_size; ++i) {
+//                    for (size_t j = i + 1; j < _new_size; ++j) {
+//                        if (_new[i] == _new[j]) {
+//                            continue;
+//                        }
+//                        if (are_in_same_index(_new[i], _new[j])) {
+//                            continue;
+//                        }
+//                        auto dist = (*oracle_)(_new[i], _new[j]);
+//                        if (dist < graph[_new[i]].candidates_.front().distance ||
+//                            dist < graph[_new[j]].candidates_.front().distance) {
+//                            cnt += graph[_new[i]].pushHeap(_new[j], dist);
+//                            cnt += graph[_new[j]].pushHeap(_new[i], dist);
+//                        }
+//                    }
+//                    for (size_t j = 0; j < _old_size; ++j) {
+//                        if (_new[i] == _old[j]) {
+//                            continue;
+//                        }
+//                        if (are_in_same_index(_new[i], _old[j])) {
+//                            continue;
+//                        }
+//                        auto dist = (*oracle_)(_new[i], _old[j]);
+//                        if (dist < graph[_new[i]].candidates_.front().distance ||
+//                            dist < graph[_old[j]].candidates_.front().distance) {
+//                            cnt += graph[_new[i]].pushHeap(_old[j], dist);
+//                            cnt += graph[_old[j]].pushHeap(_new[i], dist);
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        logger << "Iteration " << it << " with " << cnt << " new edges" << std::endl;
+//        unsigned convergence = std::lround(THRESHOLD * static_cast<float>(graph.size()) *
+//                                           static_cast<float>(max_base_degree_));
+//        connect_no_indegree(graph);
+//
+//        if (cnt <= convergence) {
+//            break;
+//        }
+//
+//        if (save_helper_.is_enabled() && it % save_helper_.save_frequency == 0) {
+//            logger << "Saving temporary index to " << save_helper_.save_path << std::endl;
+//            auto params = extract_params();
+//            params["phase"] = cur_phase_;
+//            params["iteration"] = it;
+//            saveGraph(graph, save_helper_.save_path, params);
+//            logger << "Saved index at iteration " << it << " to " << save_helper_.save_path
+//                   << std::endl;
+//        }
+//    } while (++it && it <= ITER_MAX);
+//}
+
 void
 FGIM::update_neighbors(Graph& graph) {
-    // FIXME Segmentation Fault???
     size_t it = start_iter_;
+
+    Bitset visited(graph.size());
     unsigned samples = sample_rate_ * max_base_degree_;
     do {
         int cnt = 0;
 #pragma omp parallel
         {
             std::mt19937 rng(2024 + omp_get_thread_num());
-            std::vector<int> _old, _new;
+            std::vector<IdType> _old, _new;
+            std::vector<IdType> _stack;
+            _stack.reserve(max_base_degree_ * 4);
             _old.reserve(max_base_degree_ * 2);
             _new.reserve(max_base_degree_ * 2);
 #pragma omp for reduction(+ : cnt) schedule(dynamic, 256)
             for (int vv = 0; vv < graph.size(); ++vv) {
-                auto& v = graph[vv];
-                _old.clear();
-                _new.clear();
-                for (auto& u : v.candidates_) {
-                    if (u.flag) {
-                        _new.emplace_back(u.id);
-                        {
-                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
-                            graph[u.id].reverse_new_.emplace_back(vv);
-                        }
-                        u.flag = false;
-                    } else {
-                        _old.emplace_back(u.id);
-                        {
-                            std::lock_guard<std::mutex> guard(graph[u.id].lock_);
-                            graph[u.id].reverse_old_.emplace_back(vv);
-                        }
-                    }
+                if (visited.test_and_set(vv)) {
+                    continue;
                 }
 
-                {
-                    std::lock_guard<std::mutex> guard(v.lock_);
-                    if (!v.reverse_old_.empty()) {
-                        _old.insert(_old.end(),
-                                    std::make_move_iterator(v.reverse_old_.begin()),
-                                    std::make_move_iterator(v.reverse_old_.end()));
-                        v.reverse_old_.clear();
-                    }
-                    if (!v.reverse_new_.empty()) {
-                        _new.insert(_new.end(),
-                                    std::make_move_iterator(v.reverse_new_.begin()),
-                                    std::make_move_iterator(v.reverse_new_.end()));
-                        v.reverse_new_.clear();
-                    }
-                }
+                _stack.clear();
+                _stack.push_back(vv);
 
-                std::shuffle(_old.begin(), _old.end(), rng);
-                if (_old.size() > samples) {
-                    _old.resize(samples);
-                }
-                std::shuffle(_new.begin(), _new.end(), rng);
-                if (_new.size() > samples) {
-                    _new.resize(samples);
-                }
-
-                auto _new_size = _new.size();
-                auto _old_size = _old.size();
-                for (size_t i = 0; i < _new_size; ++i) {
-                    for (size_t j = i + 1; j < _new_size; ++j) {
-                        if (_new[i] == _new[j]) {
-                            continue;
+                while (!_stack.empty()) {
+                    auto now = _stack.back();
+                    _stack.pop_back();
+                    auto& v = graph[now];
+                    _old.clear();
+                    _new.clear();
+                    for (auto& u : v.candidates_) {
+                        if (u.flag) {
+                            _new.emplace_back(u.id);
+                            {
+                                std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+                                graph[u.id].reverse_new_.emplace_back(vv);
+                            }
+                            u.flag = false;
+                        } else {
+                            _old.emplace_back(u.id);
+                            {
+                                std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+                                graph[u.id].reverse_old_.emplace_back(vv);
+                            }
                         }
-                        if (are_in_same_index(_new[i], _new[j])) {
-                            continue;
-                        }
-                        auto dist = (*oracle_)(_new[i], _new[j]);
-                        if (dist < graph[_new[i]].candidates_.front().distance ||
-                            dist < graph[_new[j]].candidates_.front().distance) {
-                            cnt += graph[_new[i]].pushHeap(_new[j], dist);
-                            cnt += graph[_new[j]].pushHeap(_new[i], dist);
+                        if (!visited.test_and_set(u.id)) {
+                            _stack.emplace_back(u.id);
                         }
                     }
-                    for (size_t j = 0; j < _old_size; ++j) {
-                        if (_new[i] == _old[j]) {
-                            continue;
+
+                    {
+                        std::lock_guard<std::mutex> guard(v.lock_);
+                        if (!v.reverse_old_.empty()) {
+                            _old.insert(_old.end(),
+                                        std::make_move_iterator(v.reverse_old_.begin()),
+                                        std::make_move_iterator(v.reverse_old_.end()));
+                            v.reverse_old_.clear();
                         }
-                        if (are_in_same_index(_new[i], _old[j])) {
-                            continue;
+                        if (!v.reverse_new_.empty()) {
+                            _new.insert(_new.end(),
+                                        std::make_move_iterator(v.reverse_new_.begin()),
+                                        std::make_move_iterator(v.reverse_new_.end()));
+                            v.reverse_new_.clear();
                         }
-                        auto dist = (*oracle_)(_new[i], _old[j]);
-                        if (dist < graph[_new[i]].candidates_.front().distance ||
-                            dist < graph[_old[j]].candidates_.front().distance) {
-                            cnt += graph[_new[i]].pushHeap(_old[j], dist);
-                            cnt += graph[_old[j]].pushHeap(_new[i], dist);
+                    }
+
+                    std::shuffle(_old.begin(), _old.end(), rng);
+                    if (_old.size() > samples) {
+                        _old.resize(samples);
+                    }
+                    std::shuffle(_new.begin(), _new.end(), rng);
+                    if (_new.size() > samples) {
+                        _new.resize(samples);
+                    }
+
+                    auto _new_size = _new.size();
+                    auto _old_size = _old.size();
+                    for (size_t i = 0; i < _new_size; ++i) {
+                        for (size_t j = i + 1; j < _new_size; ++j) {
+                            if (_new[i] == _new[j]) {
+                                continue;
+                            }
+                            if (are_in_same_index(_new[i], _new[j])) {
+                                continue;
+                            }
+                            auto dist = (*oracle_)(_new[i], _new[j]);
+                            if (dist < graph[_new[i]].candidates_.front().distance ||
+                                dist < graph[_new[j]].candidates_.front().distance) {
+                                cnt += graph[_new[i]].pushHeap(_new[j], dist);
+                                cnt += graph[_new[j]].pushHeap(_new[i], dist);
+                            }
+                        }
+                        for (size_t j = 0; j < _old_size; ++j) {
+                            if (_new[i] == _old[j]) {
+                                continue;
+                            }
+                            if (are_in_same_index(_new[i], _old[j])) {
+                                continue;
+                            }
+                            auto dist = (*oracle_)(_new[i], _old[j]);
+                            if (dist < graph[_new[i]].candidates_.front().distance ||
+                                dist < graph[_old[j]].candidates_.front().distance) {
+                                cnt += graph[_new[i]].pushHeap(_old[j], dist);
+                                cnt += graph[_old[j]].pushHeap(_new[i], dist);
+                            }
                         }
                     }
                 }
@@ -176,6 +309,7 @@ FGIM::update_neighbors(Graph& graph) {
             logger << "Saved index at iteration " << it << " to " << save_helper_.save_path
                    << std::endl;
         }
+        visited.clear();
     } while (++it && it <= ITER_MAX);
 }
 
@@ -544,7 +678,7 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
             }
             auto _offset = graph_idx == 0 ? 0 : offsets_[graph_idx - 1];
             auto& index = indexes[graph_idx];
-            auto result = index->search(data, L, L);
+            auto result = index->search(data.get(), L, L);
             for (auto&& res : result) {
                 graph_[u].pushHeap(res.id + _offset, res.distance);
             }
@@ -574,11 +708,6 @@ FGIM::Refinement() {
     add_reverse_edge(graph_);
     timer.end();
     logger << "Adding reverse edge time: " << timer.elapsed() << "s" << std::endl;
-
-    timer.start();
-    connect_no_indegree(graph_);
-    timer.end();
-    logger << "Connecting no indegree time: " << timer.elapsed() << "s" << std::endl;
 }
 
 void
@@ -600,19 +729,20 @@ FGIM::combine(std::vector<IndexPtr>& indexes) {
         u.candidates_.reserve(max_base_degree_);
     }
 
-    load_latest(graph_);
-
     Timer timer;
     timer.start();
 
-    if (start_iter_ == 0) {
-        logger << "Start merging index from scratch." << std::endl;
-        CrossQuery(indexes);
-    } else {
-        logger << "Start merging index from iteration " << start_iter_ << std::endl;
-    }
+    CrossQuery(indexes);
+    print_memory_usage();
 
+    logger << "Max Index Size " << max_index_size_ << std::endl;
+    logger << "Offsets:";
+    for (auto& v : offsets_) {
+        logger << " " << v;
+    }
+    logger << std::endl;
     Refinement();
+    print_memory_usage();
 
     timer.end();
     logger << "Merging time: " << timer.elapsed() << "s" << std::endl;
@@ -642,7 +772,7 @@ ParamMap
 FGIM::extract_params() {
     auto params = Index::extract_params();
     params["index_type"] = "FGIM";
-    params["max_degree"] = (uint64_t) max_degree_;
+    params["max_degree"] = (uint64_t)max_degree_;
     params["sample_rate"] = sample_rate_;
     return params;
 }

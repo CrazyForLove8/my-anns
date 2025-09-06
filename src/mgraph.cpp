@@ -180,7 +180,7 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
             }
             auto _offset = graph_idx == 0 ? 0 : offsets_[graph_idx - 1];
             auto& index = indexes[graph_idx];
-            auto result = index->search(data, L, L);
+            auto result = index->search(data.get(), L, L);
             for (auto&& res : result) {
                 graph_[0][u].pushHeap(res.id + _offset, res.distance);
             }
@@ -275,8 +275,14 @@ MGraph::ReconstructHGraph() {
 
         uint32_t cur_node_ = enter_point_;
         for (auto i = max_level_copy; i > level; --i) {
-            auto res = search_layer(
-                oracle_.get(), visited_list_pool_.get(), graph_, i, (*oracle_)[u], 1, 1, cur_node_);
+            auto res = search_layer(oracle_.get(),
+                                    visited_list_pool_.get(),
+                                    graph_,
+                                    i,
+                                    (*oracle_)[u].get(),
+                                    1,
+                                    1,
+                                    cur_node_);
             cur_node_ = res[0].id;
         }
 
@@ -285,7 +291,7 @@ MGraph::ReconstructHGraph() {
                                     visited_list_pool_.get(),
                                     graph_,
                                     i,
-                                    (*oracle_)[u],
+                                    (*oracle_)[u].get(),
                                     ef_construction_,
                                     ef_construction_,
                                     cur_node_);
@@ -370,7 +376,7 @@ MGraph::combine(std::vector<IndexPtr>& indexes) {
     Refinement();
     print_memory_usage();
 
-    ReconstructHGraph();
+    //    ReconstructHGraph();
 
     timer.end();
     logger << "Merging time: " << timer.elapsed() << "s" << std::endl;
@@ -402,7 +408,7 @@ ParamMap
 MGraph::extract_params() {
     auto params = FGIM::extract_params();
     params["index_type"] = "MGraph";
-    params["ef_construction"] = (uint64_t) ef_construction_;
+    params["ef_construction"] = (uint64_t)ef_construction_;
     return params;
 }
 void

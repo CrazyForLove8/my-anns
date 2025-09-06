@@ -16,30 +16,21 @@
 #include <random>
 
 #include "dataset.h"
+#include "timer.h"
 
-// TODO Only center is needed. Point can be replaced by short*.
-struct Point {
-    Point() = default;
-
-    Point(int id, int group) : id_(id), group_(group) {
-    }
-
-    ~Point() {
-        delete[] data_;
-    }
-
-    int id_{0};
-    int group_{0};
-    float* data_{nullptr};
+struct Centroid {
+    std::shared_ptr<float[]> data_{nullptr};
 };
 
 class Kmeans {
 private:
-    std::vector<Point> points_;
-    std::vector<Point> centers_;
-    int maxIteration_{100};
-    int k_;
-    int pointNumber_;
+    std::vector<Centroid> centers_;
+    std::vector<uint8_t> points_;
+
+    uint8_t k_;
+    IdType pointNumber_;
+    static int maxIteration_;
+    float threshold_{1e-3};
 
     OraclePtr& oracle_;
 
@@ -53,7 +44,7 @@ private:
     Center();
 
 public:
-    Kmeans(DatasetPtr& dataset, int k);
+    Kmeans(DatasetPtr& dataset, uint8_t k, float threshold = 1e-4);
 
     /**
      * Get the ell nearest centers of the p
@@ -62,7 +53,7 @@ public:
      * @return
      */
     std::vector<int>
-    NearestCenter(int p, int ell);
+    NearestCenter(IdType p, uint8_t ell);
 
     void
     Run();

@@ -5,38 +5,37 @@ using namespace graph;
 std::unordered_set<std::string> angular_datasets = {"deep", "glove", "crawl"};
 
 std::shared_ptr<Dataset>
-Dataset::getInstance(const std::string& name, const std::string& size) {
+Dataset::getInstance(const std::string& name, const std::string& size, bool use_disk) {
     auto dataset = std::make_shared<Dataset>();
     dataset->name_ = name;
     dataset->size_ = size;
+    dataset->use_disk_ = use_disk;
 
     dataset->load();
     return dataset;
 }
 
 std::shared_ptr<Dataset>
-Dataset::getInstance(const std::string& base_path, DISTANCE metric) {
+Dataset::getInstance(const std::string& base_path, DISTANCE metric, bool use_disk) {
     auto dataset = std::make_shared<Dataset>();
     dataset->name_ =
         base_path.substr(base_path.find_last_of("/\\") + 1,
                          base_path.find_last_of('.') - base_path.find_last_of("/\\") - 1);
     dataset->size_ = "custom";
-
-    dataset->base_->load(base_path);
+    dataset->use_disk_ = use_disk;
+    dataset->base_->load(base_path, use_disk);
 
     switch (metric) {
         case DISTANCE::L2:
-            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(*dataset->base_);
+            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(dataset->base_);
             break;
         case DISTANCE::COSINE:
-            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(*dataset->base_);
+            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(dataset->base_);
             break;
         case DISTANCE::JACCARD:
             throw std::runtime_error("Jaccard distance is currently not supported");
-            break;
         case DISTANCE::HAMMING:
             throw std::runtime_error("Hamming distance is currently not supported");
-            break;
     }
 
     dataset->full_dataset_ = true;
@@ -49,30 +48,30 @@ std::shared_ptr<Dataset>
 Dataset::getInstance(const std::string& base_path,
                      const std::string& query_path,
                      const std::string& groundtruth_path,
-                     DISTANCE metric) {
+                     DISTANCE metric,
+                     bool use_disk) {
     auto dataset = std::make_shared<Dataset>();
     dataset->name_ =
         base_path.substr(base_path.find_last_of("/\\") + 1,
                          base_path.find_last_of('.') - base_path.find_last_of("/\\") - 1);
     dataset->size_ = "custom";
+    dataset->use_disk_ = use_disk;
 
-    dataset->base_->load(base_path);
+    dataset->base_->load(base_path, use_disk);
     dataset->query_->load(query_path);
     dataset->groundTruth_->load(groundtruth_path);
 
     switch (metric) {
         case DISTANCE::L2:
-            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(*dataset->base_);
+            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(dataset->base_);
             break;
         case DISTANCE::COSINE:
-            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(*dataset->base_);
+            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(dataset->base_);
             break;
         case DISTANCE::JACCARD:
             throw std::runtime_error("Jaccard distance is currently not supported");
-            break;
         case DISTANCE::HAMMING:
             throw std::runtime_error("Hamming distance is currently not supported");
-            break;
     }
 
     dataset->full_dataset_ = true;
@@ -127,22 +126,22 @@ Dataset::load() {
         throw std::runtime_error("Unknown dataset");
     }
 
-    base_->load(base_path);
+    base_->load(base_path, use_disk_);
     query_->load(query_path);
     groundTruth_->load(groundtruth_path);
 
     if (angular_datasets.find(name_) != angular_datasets.end()) {
-        oracle_ = MatrixOracle<float, metric::angular>::getInstance(*base_);
+        oracle_ = MatrixOracle<float, metric::angular>::getInstance(base_);
         distance_ = DISTANCE::COSINE;
     } else {
-        oracle_ = MatrixOracle<float, metric::l2>::getInstance(*base_);
+        oracle_ = MatrixOracle<float, metric::l2>::getInstance(base_);
     }
 
     full_dataset_ = true;
     visited_list_pool_ = VisitedListPool::getInstance(base_->size());
 }
 
-void
+[[maybe_unused]] void
 Dataset::createOracle() {
     // TODO create oracle based on the distance metric or dataset name
 }
@@ -202,19 +201,18 @@ Dataset::split(std::vector<DatasetPtr>& datasets, unsigned int num) {
     datasets.resize(num - 1);
     auto matrices = base_->split(num);
     if (angular) {
-        oracle_ = MatrixOracle<float, metric::angular>::getInstance(*base_);
+        oracle_ = MatrixOracle<float, metric::angular>::getInstance(base_);
     } else {
-        oracle_ = MatrixOracle<float, metric::l2>::getInstance(*base_);
+        oracle_ = MatrixOracle<float, metric::l2>::getInstance(base_);
     }
     for (unsigned int i = 0; i < num - 1; i++) {
         datasets[i] = std::make_shared<Dataset>();
         datasets[i]->base_ = std::make_shared<Matrix<float> >(matrices[i]);
         if (angular) {
             datasets[i]->oracle_ =
-                MatrixOracle<float, metric::angular>::getInstance(*datasets[i]->base_);
+                MatrixOracle<float, metric::angular>::getInstance(datasets[i]->base_);
         } else {
-            datasets[i]->oracle_ =
-                MatrixOracle<float, metric::l2>::getInstance(*datasets[i]->base_);
+            datasets[i]->oracle_ = MatrixOracle<float, metric::l2>::getInstance(datasets[i]->base_);
         }
         datasets[i]->full_dataset_ = false;
         datasets[i]->name_ = name_;
@@ -248,9 +246,9 @@ Dataset::subsets(const unsigned int num) const {
         logger << "Creating subset of " << name_ << " " << i + 1 << "/" << num << " with size "
                << dataset->base_->size() << std::endl;
         if (angular) {
-            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(*dataset->base_);
+            dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(dataset->base_);
         } else {
-            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(*dataset->base_);
+            dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(dataset->base_);
         }
         dataset->name_ = name_;
         dataset->size_ = size_;
@@ -279,7 +277,7 @@ Dataset::merge(std::vector<DatasetPtr>& datasets) {
         matrices.emplace_back(dataset->getBasePtr());
     }
     base_->append(matrices);
-    oracle_->reset(*base_);
+    oracle_->reset(base_);
 }
 
 DatasetPtr
@@ -318,9 +316,9 @@ Dataset::aggregate(std::vector<DatasetPtr>& datasets) {
     dataset->base_ = matrixPtr;
     dataset->distance_ = distance;
     if (distance == DISTANCE::COSINE) {
-        dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(*matrixPtr);
+        dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(matrixPtr);
     } else {
-        dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(*matrixPtr);
+        dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(matrixPtr);
     }
     dataset->full_dataset_ = true;
     dataset->visited_list_pool_ = VisitedListPool::getInstance(matrixPtr->size());
@@ -350,7 +348,7 @@ Dataset::getSize() {
     return size_;
 }
 
-std::vector<std::vector<unsigned int> >
+[[maybe_unused]] std::vector<std::vector<unsigned int> >
 graph::loadGroundTruth(const std::string& filename, unsigned int qsize, unsigned int K) {
     std::ifstream input(filename, std::ios::binary);
     if (!input.is_open()) {
@@ -362,7 +360,6 @@ graph::loadGroundTruth(const std::string& filename, unsigned int qsize, unsigned
     std::vector<int> temp(t);
     input.seekg(0, std::ios::beg);
     for (int i = 0; i < qsize; i++) {
-        int t;
         input.read((char*)&t, 4);
         input.read((char*)temp.data(), K * 4);
         for (int j = 0; j < K; j++) {

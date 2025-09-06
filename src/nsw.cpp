@@ -29,7 +29,7 @@ nsw::NSW::addPoint(unsigned int index) {
     auto res = knn_search(oracle_.get(),
                           visited_list_pool_.get(),
                           graph_,
-                          (*oracle_)[index],
+                          (*oracle_)[index].get(),
                           max_neighbors_,
                           ef_construction_,
                           std::numeric_limits<IdType>::max(),

@@ -58,6 +58,9 @@ public:
     }
 
     Log&
+    operator<<(uint8_t v);
+
+    Log&
     operator<<(std::ostream& (*func)(std::ostream&));
 
     /**

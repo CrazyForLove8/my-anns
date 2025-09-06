@@ -105,9 +105,55 @@ testSubset() {
     }
 }
 
+void
+testSSD() {
+    {
+        print_memory_usage();
+        auto dataset = Dataset::getInstance("sift", "1m");
+
+        std::cout << "In-memory dataset && direct access" << std::endl;
+        for (int i = 0; i < 5; ++i) {
+            for (int j = 0; j < 10; ++j) {
+                std::cout << (*dataset->getBasePtr())(i, j) << " ";
+            }
+            std::cout << std::endl;
+        }
+
+        std::cout << "In-memory dataset && oracle access" << std::endl;
+        for (int i = 0; i < 5; ++i) {
+            for (int j = 0; j < 10; ++j) {
+                std::cout << (*dataset->getOracle())(i, j) << " ";
+            }
+            std::cout << std::endl;
+        }
+        print_memory_usage();
+    }
+
+    {
+        print_memory_usage();
+        std::cout << "SSD dataset && direct access" << std::endl;
+        auto dataset = Dataset::getInstance("sift", "1m", true);
+        for (int i = 0; i < 5; ++i) {
+            for (int j = 0; j < 10; ++j) {
+                std::cout << (*dataset->getBasePtr())(i, j) << " ";
+            }
+            std::cout << std::endl;
+        }
+
+        std::cout << "SSD dataset && oracle access" << std::endl;
+        for (int i = 0; i < 5; ++i) {
+            for (int j = 0; j < 10; ++j) {
+                std::cout << (*dataset->getOracle())(i, j) << " ";
+            }
+            std::cout << std::endl;
+        }
+        print_memory_usage();
+    }
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    testSubset();
+    testSSD();
 }

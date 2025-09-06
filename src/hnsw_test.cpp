@@ -254,7 +254,6 @@ test_enable_save_help() {
     auto path = saveHGraph(index1->extract_hgraph(), "index1.bin", index1->extract_params());
     auto hnsw = std::make_shared<hnsw::HNSW>(dataset, path);
     hnsw->set_save_helper({3, "hnsw_checkpoint.bin"});
-    hnsw->partial_build();
 }
 
 void
@@ -264,7 +263,6 @@ test_load_checkpoint() {
     auto path = "./graph_output/hnsw_checkpoint.bin";
     auto hnsw = std::make_shared<hnsw::HNSW>(dataset, path);
     hnsw->set_save_helper({4, "hnsw_checkpoint.bin"});
-    hnsw->partial_build();
 }
 
 int

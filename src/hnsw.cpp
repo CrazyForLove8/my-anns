@@ -168,8 +168,14 @@ hnsw::HNSW::addPoint(IdType index) {
 
     uint32_t cur_node_ = enter_point_;
     for (auto i = max_level_copy; i > level; --i) {
-        auto res = search_layer(
-            oracle_.get(), visited_list_pool_.get(), graph_, i, (*oracle_)[index], 1, 1, cur_node_);
+        auto res = search_layer(oracle_.get(),
+                                visited_list_pool_.get(),
+                                graph_,
+                                i,
+                                (*oracle_)[index].get(),
+                                1,
+                                1,
+                                cur_node_);
         cur_node_ = res[0].id;
     }
 
@@ -178,7 +184,7 @@ hnsw::HNSW::addPoint(IdType index) {
                                 visited_list_pool_.get(),
                                 graph_,
                                 i,
-                                (*oracle_)[index],
+                                (*oracle_)[index].get(),
                                 ef_construction_,
                                 ef_construction_,
                                 cur_node_);
@@ -346,7 +352,7 @@ hnsw::HNSW::print_info() const {
     logger << "EF Construction: " << ef_construction_ << std::endl;
     logger << "Max Level: " << max_level_ << std::endl;
     logger << "Current Max Level: " << cur_max_level_ << std::endl;
-    logger << "Enter Point: " << enter_point_ << std::endl;
+    logger << "Enter Centroid: " << enter_point_ << std::endl;
 
     if (max_neighbors_ == 0 || max_base_neighbors_ == 0 || ef_construction_ == 0) {
         logger << "Warning: max_neighbors, max_base_neighbors, and ef_construction should be "
@@ -371,60 +377,11 @@ hnsw::HNSW::extract_hgraph() {
 
 void
 hnsw::HNSW::build_internal() {
-    IdType total = oracle_->size();
-#pragma omp parallel for schedule(dynamic)
-    for (IdType i = 1; i < total; ++i) {
-        if (i % 100000 == 0) {
-            logger << "Adding " << i << " / " << total << std::endl;
-        }
-        addPoint(i);
-    }
+    this->partial_build(1, oracle_->size());
 }
 
 void
 hnsw::HNSW::partial_build(IdType start, IdType end) {
-    if (end > oracle_->size() || start >= end) {
-        throw std::invalid_argument("Invalid range for partial build");
-    }
-    print_info();
-    logger << "Adding from " << start << " to " << end << std::endl;
-    Timer timer;
-    timer.start();
-#pragma omp parallel for schedule(dynamic)
-    for (auto i = start; i < end; ++i) {
-        if (i % 10000 == 0) {
-            logger << "Adding " << i << " / " << end << std::endl;
-        }
-        addPoint(i);
-    }
-    timer.end();
-    logger << "Indexing time: " << timer.elapsed() << "s" << std::endl;
-    cur_size_ += end - start;
-    if (cur_size_ == oracle_->size()) {
-        flatten_graph_ = FlattenHGraph(graph_);
-        built_ = true;
-    } else {
-        built_ = false;
-    }
-}
-
-void
-hnsw::HNSW::partial_build(IdType num) {
-    print_info();
-    auto start = cur_size_;
-    auto end = cur_size_ == 1 ? num : cur_size_ + num;
-    if (num == 0) {
-        end = oracle_->size();
-        num = end - start;
-        if (num == 0) {
-            logger << "No points to add, skipping build." << std::endl;
-            return;
-        }
-    }
-
-    if (end > oracle_->size()) {
-        throw std::invalid_argument("Invalid range for partial build");
-    }
     logger << "Adding from " << start << " to " << end << std::endl;
     Timer timer;
     timer.start();
@@ -447,11 +404,29 @@ hnsw::HNSW::partial_build(IdType num) {
     }
     timer.end();
     logger << "Adding time: " << timer.elapsed() << "s" << std::endl;
-    if (cur_size_ == 1) {
-        cur_size_ = num;
-    } else {
-        cur_size_ += num;
+}
+
+void
+hnsw::HNSW::partial_build(IdType num) {
+    print_info();
+    auto start = cur_size_ == 0 ? 1 : cur_size_;
+    auto end = cur_size_ + num;
+    if (num == 0) {
+        end = oracle_->size();
+        num = end - start;
+        if (num == 0) {
+            logger << "No points to add, skipping build." << std::endl;
+            return;
+        }
     }
+    if (end > oracle_->size()) {
+        num = oracle_->size() - start;
+        end = oracle_->size();
+    }
+
+    this->partial_build(start, end);
+
+    cur_size_ += num;
     if (cur_size_ == oracle_->size()) {
         logger << "Partial build completed, total size: " << cur_size_ << std::endl;
         flatten_graph_ = FlattenHGraph(graph_);
@@ -550,11 +525,11 @@ ParamMap
 hnsw::HNSW::extract_params() {
     auto params = Index::extract_params();
     params["index_type"] = "HNSW";
-    params["max_neighbors"] = (uint64_t) max_neighbors_;
-    params["ef_construction"] = (uint64_t) ef_construction_;
-    params["enter_point"] = (uint64_t) enter_point_;
-    params["max_level"] = (uint64_t) max_level_;
-    params["cur_max_level"] = (uint64_t) cur_max_level_;
+    params["max_neighbors"] = (uint64_t)max_neighbors_;
+    params["ef_construction"] = (uint64_t)ef_construction_;
+    params["enter_point"] = (uint64_t)enter_point_;
+    params["max_level"] = (uint64_t)max_level_;
+    params["cur_max_level"] = (uint64_t)cur_max_level_;
     return params;
 }
 void
