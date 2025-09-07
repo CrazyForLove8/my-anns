@@ -376,7 +376,7 @@ MGraph::combine(std::vector<IndexPtr>& indexes) {
     Refinement();
     print_memory_usage();
 
-    //    ReconstructHGraph();
+    ReconstructHGraph();
 
     timer.end();
     logger << "Merging time: " << timer.elapsed() << "s" << std::endl;

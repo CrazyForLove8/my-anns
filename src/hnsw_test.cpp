@@ -265,6 +265,22 @@ test_load_checkpoint() {
     hnsw->set_save_helper({4, "hnsw_checkpoint.bin"});
 }
 
+void
+test_partial_build_multi_thread() {
+    DatasetPtr dataset = Dataset::getInstance("sift", "1m");
+    auto index = std::make_shared<HNSW>(dataset, 32, 200);
+    int split = 2;
+    int size = dataset->getOracle()->size() / split;
+    int remainder = dataset->getOracle()->size() % split;
+    for (int i = 0; i < split; ++i) {
+        if (i == split - 1) {
+            size += remainder;
+        }
+        index->partial_build(size);
+    }
+    recall(index, dataset, 200);
+}
+
 int
 main() {
     Log::setVerbose(true);
