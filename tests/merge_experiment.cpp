@@ -474,21 +474,53 @@ mergeExp10(DatasetPtr& dataset) {
     }
 }
 
-#define ALARM_FINISHED 1
+void
+mergeExp_nsw_and_hnsw_build(DatasetPtr& dataset) {
+    Log::redirect("nsw_hnsw_build_" + dataset->getName());
+    omp_set_num_threads(1);
+
+    auto subsets = dataset->subsets(2);
+
+    auto nsw = std::make_shared<nsw::NSW>(subsets[0], 32, 200);
+    Timer sub_timer, total_timer;
+    sub_timer.start();
+    total_timer.start();
+    nsw->build();
+    sub_timer.end();
+    std::cout << "NSW first part build time: " << sub_timer.elapsed() << "s" << std::endl;
+    nsw = std::make_shared<nsw::NSW>(subsets[1], 32, 200);
+    sub_timer.start();
+    nsw->build();
+    sub_timer.end();
+    std::cout << "NSW second part build time: " << sub_timer.elapsed() << "s" << std::endl;
+    total_timer.end();
+    std::cout << "Total NSW build time: " << total_timer.elapsed() << "s" << std::endl;
+
+    auto hnsw = std::make_shared<hnsw::HNSW>(subsets[0], 16, 200);
+    sub_timer.start();
+    total_timer.start();
+    hnsw->build();
+    sub_timer.end();
+    std::cout << "HNSW first part build time: " << sub_timer.elapsed() << "s" << std::endl;
+    hnsw = std::make_shared<hnsw::HNSW>(subsets[1], 16, 200);
+    sub_timer.start();
+    hnsw->build();
+    sub_timer.end();
+    std::cout << "HNSW second part build time: " << sub_timer.elapsed() << "s" << std::endl;
+    total_timer.end();
+    std::cout << "Total HNSW build time: " << total_timer.elapsed() << "s" << std::endl;
+}
 
 int
 main() {
     Log::setVerbose(true);
     auto dataset = Dataset::getInstance("msong", "1m");
-    //    print_memory_usage();
-    exp_multiple(dataset);
+    mergeExp_nsw_and_hnsw_build(dataset);
 
-#if ALARM_FINISHED
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
     if (ret != 0) {
         std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
     }
-#endif
 
     return 0;
 }

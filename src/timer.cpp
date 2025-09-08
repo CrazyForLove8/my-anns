@@ -19,7 +19,7 @@ Timer::start() {
 void
 Timer::end() {
     if (!started) {
-        throw std::runtime_error("Timer not started");
+        std::cerr << "Warning: Timer was not started. Cannot end." << std::endl;
     }
     started = false;
     _end = std::chrono::steady_clock::now();

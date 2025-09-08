@@ -6,6 +6,7 @@
 #define MYANNS_TIMER_H
 
 #include <chrono>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
