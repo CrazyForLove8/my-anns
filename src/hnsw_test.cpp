@@ -267,10 +267,27 @@ test_load_checkpoint() {
     hnsw->partial_build();
 }
 
+void
+test_multi_thread() {
+    int num = 12;
+    DatasetPtr dataset = Dataset::getInstance("sift", "1m");
+    Log::redirect("hnsw_multi_" + dataset->getName());
+    auto index = std::make_shared<HNSW>(dataset, 20, 200);
+    auto size = dataset->getOracle()->size();
+    index->partial_build(size / 2);
+    omp_set_num_threads(num);
+    index->partial_build(size - size / 2);
+    recall(index, dataset, 200);
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    testBuild();
+    test_multi_thread();
+    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
+    if (ret != 0) {
+        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
+    }
     return 0;
 }
