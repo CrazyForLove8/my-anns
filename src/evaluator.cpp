@@ -4,7 +4,7 @@
 #include "mgraph.h"
 
 #ifndef MULTITHREAD
-#define MULTITHREAD 0
+#define MULTITHREAD 1
 #endif
 
 void
@@ -94,10 +94,10 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
             search_Ls = {
                 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600};
         } else {
-            for (int i = 20; i < 100; i += 10) {
+            for (int i = 20; i < 100; i += 20) {
                 search_Ls.push_back(i);
             }
-            for (int i = 100; i < 400; i += 50) {
+            for (int i = 100; i < 400; i += 100) {
                 search_Ls.push_back(i);
             }
             for (int i = 400; i < 1000; i += 100) {

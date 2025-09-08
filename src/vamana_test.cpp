@@ -339,15 +339,15 @@ test_save() {
 
 void
 test_vamana_partial_build_disk() {
-    auto dataset = Dataset::getInstance("deep", "1m", true);
-    Log::redirect("vamana_partial_build_disk" + dataset->getName());
+    auto dataset = Dataset::getInstance("msong", "1m", true);
+    Log::redirect("freshvamana_disk" + dataset->getName());
 
     auto size = dataset->getOracle()->size();
     auto index = std::make_shared<diskann::Vamana>(dataset, 1.2, 200, 32);
     index->partial_build(size / 2);
     index->partial_build(size - size / 2);
 
-    recall(index, dataset, 200);
+    recall(index, dataset);
 }
 
 void
@@ -374,7 +374,7 @@ int
 main() {
     Log::setVerbose(true);
 
-    testBuild();
+    test_vamana_partial_build_disk();
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
     if (ret != 0) {
         std::cerr << "Warning: System command failed with exit code " << ret << std::endl;

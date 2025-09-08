@@ -179,6 +179,142 @@ FGIM::load_latest(Graph& graph, const std::filesystem::path& directoryPath) {
 //    } while (++it && it <= ITER_MAX);
 //}
 
+//dfs
+//void
+//FGIM::update_neighbors(Graph& graph) {
+//    size_t it = start_iter_;
+//
+//    Bitset visited(graph.size());
+//    unsigned samples = sample_rate_ * max_base_degree_;
+//    do {
+//        int cnt = 0;
+//#pragma omp parallel
+//        {
+//            std::mt19937 rng(2024 + omp_get_thread_num());
+//            std::vector<IdType> _old, _new;
+//            std::vector<IdType> _stack;
+//            _stack.reserve(max_base_degree_ * 4);
+//            _old.reserve(max_base_degree_ * 2);
+//            _new.reserve(max_base_degree_ * 2);
+//#pragma omp for reduction(+ : cnt) schedule(dynamic, 256)
+//            for (int vv = 0; vv < graph.size(); ++vv) {
+//                if (visited.test_and_set(vv)) {
+//                    continue;
+//                }
+//
+//                _stack.clear();
+//                _stack.push_back(vv);
+//
+//                while (!_stack.empty()) {
+//                    auto now = _stack.back();
+//                    _stack.pop_back();
+//                    auto& v = graph[now];
+//                    _old.clear();
+//                    _new.clear();
+//                    for (auto& u : v.candidates_) {
+//                        if (u.flag) {
+//                            _new.emplace_back(u.id);
+//                            {
+//                                std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+//                                graph[u.id].reverse_new_.emplace_back(vv);
+//                            }
+//                            u.flag = false;
+//                        } else {
+//                            _old.emplace_back(u.id);
+//                            {
+//                                std::lock_guard<std::mutex> guard(graph[u.id].lock_);
+//                                graph[u.id].reverse_old_.emplace_back(vv);
+//                            }
+//                        }
+//                        if (!visited.test_and_set(u.id)) {
+//                            _stack.emplace_back(u.id);
+//                        }
+//                    }
+//
+//                    {
+//                        std::lock_guard<std::mutex> guard(v.lock_);
+//                        if (!v.reverse_old_.empty()) {
+//                            _old.insert(_old.end(),
+//                                        std::make_move_iterator(v.reverse_old_.begin()),
+//                                        std::make_move_iterator(v.reverse_old_.end()));
+//                            v.reverse_old_.clear();
+//                        }
+//                        if (!v.reverse_new_.empty()) {
+//                            _new.insert(_new.end(),
+//                                        std::make_move_iterator(v.reverse_new_.begin()),
+//                                        std::make_move_iterator(v.reverse_new_.end()));
+//                            v.reverse_new_.clear();
+//                        }
+//                    }
+//
+//                    std::shuffle(_old.begin(), _old.end(), rng);
+//                    if (_old.size() > samples) {
+//                        _old.resize(samples);
+//                    }
+//                    std::shuffle(_new.begin(), _new.end(), rng);
+//                    if (_new.size() > samples) {
+//                        _new.resize(samples);
+//                    }
+//
+//                    auto _new_size = _new.size();
+//                    auto _old_size = _old.size();
+//                    for (size_t i = 0; i < _new_size; ++i) {
+//                        for (size_t j = i + 1; j < _new_size; ++j) {
+//                            if (_new[i] == _new[j]) {
+//                                continue;
+//                            }
+//                            if (are_in_same_index(_new[i], _new[j])) {
+//                                continue;
+//                            }
+//                            auto dist = (*oracle_)(_new[i], _new[j]);
+//                            if (dist < graph[_new[i]].candidates_.front().distance ||
+//                                dist < graph[_new[j]].candidates_.front().distance) {
+//                                cnt += graph[_new[i]].pushHeap(_new[j], dist);
+//                                cnt += graph[_new[j]].pushHeap(_new[i], dist);
+//                            }
+//                        }
+//                        for (size_t j = 0; j < _old_size; ++j) {
+//                            if (_new[i] == _old[j]) {
+//                                continue;
+//                            }
+//                            if (are_in_same_index(_new[i], _old[j])) {
+//                                continue;
+//                            }
+//                            auto dist = (*oracle_)(_new[i], _old[j]);
+//                            if (dist < graph[_new[i]].candidates_.front().distance ||
+//                                dist < graph[_old[j]].candidates_.front().distance) {
+//                                cnt += graph[_new[i]].pushHeap(_old[j], dist);
+//                                cnt += graph[_old[j]].pushHeap(_new[i], dist);
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//
+//        logger << "Iteration " << it << " with " << cnt << " new edges" << std::endl;
+//        unsigned convergence = std::lround(THRESHOLD * static_cast<float>(graph.size()) *
+//                                           static_cast<float>(max_base_degree_));
+//        connect_no_indegree(graph);
+//
+//        if (cnt <= convergence) {
+//            break;
+//        }
+//
+//        if (save_helper_.is_enabled() && it % save_helper_.save_frequency == 0) {
+//            logger << "Saving temporary index to " << save_helper_.save_path << std::endl;
+//            auto params = extract_params();
+//            params["phase"] = cur_phase_;
+//            params["iteration"] = it;
+//            saveGraph(graph, save_helper_.save_path, params);
+//            logger << "Saved index at iteration " << it << " to " << save_helper_.save_path
+//                   << std::endl;
+//        }
+//        visited.clear();
+//    } while (++it && it <= ITER_MAX);
+//}
+
+// TODO bfs
 void
 FGIM::update_neighbors(Graph& graph) {
     size_t it = start_iter_;
@@ -511,15 +647,21 @@ FGIM::prune(Graph& graph, bool add) {
 void
 FGIM::add_reverse_edge(Graph& graph) {
     Graph reverse_graph(graph.size());
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1024)
     for (int u = 0; u < graph.size(); ++u) {
+        if (graph[u].candidates_.empty()) {
+            continue;
+        }
         for (auto& v : graph[u].candidates_) {
             std::lock_guard<std::mutex> guard(reverse_graph[v.id].lock_);
             reverse_graph[v.id].candidates_.emplace_back(u, v.distance, true);
         }
     }
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic, 1024)
     for (int u = 0; u < graph.size(); ++u) {
+        if (reverse_graph[u].candidates_.empty()) {
+            continue;
+        }
         graph[u].candidates_.insert(graph[u].candidates_.end(),
                                     reverse_graph[u].candidates_.begin(),
                                     reverse_graph[u].candidates_.end());
