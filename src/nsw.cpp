@@ -1,7 +1,7 @@
 #include "nsw.h"
 
-nsw::NSW::NSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
-    : Index(dataset), max_neighbors_(max_neighbors), ef_construction_(ef_construction) {
+nsw::NSW::NSW(const IndexParam& param, int max_neighbors, int ef_construction)
+    : Index(param), max_neighbors_(max_neighbors), ef_construction_(ef_construction) {
 }
 
 //void
@@ -26,14 +26,14 @@ nsw::NSW::NSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
 void
 nsw::NSW::addPoint(unsigned int index) {
     std::lock_guard<std::mutex> cur(graph_[index].lock_);
-    auto res = knn_search(oracle_.get(),
-                          visited_list_pool_.get(),
-                          graph_,
-                          (*oracle_)[index].get(),
-                          max_neighbors_,
-                          ef_construction_,
-                          std::numeric_limits<IdType>::max(),
-                          index);
+    auto res = search_one_graph(oracle_.get(),
+                                visited_list_pool_.get(),
+                                graph_,
+                                (*oracle_)[index],
+                                max_neighbors_,
+                                ef_construction_,
+                                std::numeric_limits<IdType>::max(),
+                                index);
     for (auto& re : res) {
         graph_[index].addNeighbor(re, max_neighbors_);
         {
@@ -92,11 +92,11 @@ nsw::NSW::multisearch(const Graph& graph_,
 }
 
 void
-nsw::NSW::build_internal() {
+nsw::NSW::build_internal(DatasetPtr& dataset) {
     int total = oracle_->size();
 #pragma omp parallel for schedule(dynamic)
     for (int i = 1; i < total; ++i) {
-        if (i % 10000 == 0) {
+        if (i % 100000 == 0) {
             logger << "Processing " << i << " / " << graph_.size() << std::endl;
         }
         addPoint(i);
@@ -114,12 +114,8 @@ nsw::NSW::add(DatasetPtr& dataset) {
 
     auto cur_size = oracle_->size();
     auto total = dataset->getOracle()->size() + cur_size;
-    graph_.reserve(total);
-    graph_.resize(total);
-    {
-        std::vector<DatasetPtr> datasets = {dataset};
-        dataset_->merge(datasets);
-    }
+    this->resize(total);
+    oracle_->insert(dataset->getBasePtr());
     print_info();
 
     Timer timer;

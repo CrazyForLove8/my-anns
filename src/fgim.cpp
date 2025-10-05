@@ -1,66 +1,15 @@
-#include "include/fgim.h"
+#include "fgim.h"
 
 using namespace graph;
 
-FGIM::FGIM() : max_degree_(20), max_base_degree_(40), sample_rate_(0.3) {
-}
-
-FGIM::FGIM(unsigned int max_degree, float sample_rate)
-    : max_degree_(max_degree), max_base_degree_(max_degree * 2), sample_rate_(sample_rate) {
-}
-
-FGIM::FGIM(DatasetPtr& dataset, unsigned int max_degree, float sample_rate, bool allocate)
-    : Index(dataset, allocate),
+FGIM::FGIM(const IndexParam& param,
+           const unsigned int max_degree,
+           const float sample_rate,
+           const bool allocate)
+    : Index(param, allocate),
       max_degree_(max_degree),
       max_base_degree_(max_degree * 2),
       sample_rate_(sample_rate) {
-}
-
-// TODO In the future, we will support loading from a file for each index type.
-void
-FGIM::load_latest(Graph& graph, const std::filesystem::path& directoryPath) {
-    std::filesystem::path latestFilePath;
-    int maxIteration = -1;
-
-    if (!std::filesystem::exists(directoryPath) || !std::filesystem::is_directory(directoryPath)) {
-        std::filesystem::create_directories(directoryPath);
-        return;
-    }
-
-    std::string fileBasePrefix = "fgim_";
-    std::string fileMiddlePart =
-        dataset_->getName() + "_" + serial_ + "_k_" + std::to_string(max_degree_);
-    std::string iterationSuffixPrefix = "_iter_";
-    std::string fileExtension = ".bin";
-
-    for (const auto& entry : std::filesystem::directory_iterator(directoryPath)) {
-        if (entry.is_regular_file()) {
-            std::string filename = entry.path().filename().string();
-            if (filename.rfind(fileBasePrefix, 0) == 0 &&
-                filename.find(fileMiddlePart) != std::string::npos &&
-                filename.rfind(iterationSuffixPrefix) != std::string::npos &&
-                filename.rfind(fileExtension) == filename.length() - fileExtension.length()) {
-                size_t iterPrefixPos = filename.rfind(iterationSuffixPrefix);
-                if (iterPrefixPos == std::string::npos)
-                    continue;
-                size_t iterStart = iterPrefixPos + iterationSuffixPrefix.length();
-                size_t iterEnd = filename.rfind(fileExtension);
-                if (iterEnd != std::string::npos && iterStart < iterEnd) {
-                    std::string iterStr = filename.substr(iterStart, iterEnd - iterStart);
-                    int currentIteration = std::stoi(iterStr);
-                    if (currentIteration > maxIteration) {
-                        maxIteration = currentIteration;
-                        latestFilePath = entry.path();
-                    }
-                }
-            }
-        }
-    }
-
-    if (maxIteration != -1) {
-        loadGraph(graph, latestFilePath, dataset_->getOracle());
-        start_iter_ = maxIteration + 1;
-    }
 }
 
 // Original version
@@ -820,7 +769,7 @@ FGIM::CrossQuery(std::vector<IndexPtr>& indexes) {
             }
             auto _offset = graph_idx == 0 ? 0 : offsets_[graph_idx - 1];
             auto& index = indexes[graph_idx];
-            auto result = index->search(data.get(), L, L);
+            auto result = index->search(data, L, L);
             for (auto&& res : result) {
                 graph_[u].pushHeap(res.id + _offset, res.distance);
             }
@@ -854,19 +803,15 @@ FGIM::Refinement() {
 
 void
 FGIM::combine(std::vector<IndexPtr>& indexes) {
-    if (dataset_ == nullptr) {
-        std::vector<DatasetPtr> datasets;
-        for (auto& index : indexes) {
-            datasets.emplace_back(index->extract_dataset());
-        }
-        dataset_ = Dataset::aggregate(datasets);
-        oracle_ = dataset_->getOracle();
-        visited_list_pool_ = dataset_->getVisitedListPool();
-        base_ = dataset_->getBasePtr();
-        Graph(oracle_->size()).swap(graph_);
+    IdType total_size = 0;
+    for (const auto& index : indexes) {
+        const auto vec_ptr = index->extract_vectors();
+        oracle_->insert(vec_ptr, total_size);
+        total_size += vec_ptr->size();
     }
-    print_info();
+    this->resize(total_size);
 
+    print_info();
     for (auto& u : graph_) {
         u.candidates_.reserve(max_base_degree_);
     }

@@ -56,9 +56,6 @@ protected:
     [[nodiscard]] bool
     are_in_same_index(size_t id1, size_t id2) const;
 
-    void
-    load_latest(Graph& graph, const std::filesystem::path& directoryPath = "./graph_output/");
-
 public:
     static constexpr unsigned ITER_MAX = 30;
 
@@ -66,11 +63,7 @@ public:
 
     static constexpr float THRESHOLD = 0.002;
 
-    FGIM();
-
-    explicit FGIM(unsigned max_degree, float sample_rate = 0.3);
-
-    explicit FGIM(DatasetPtr& dataset,
+    explicit FGIM(const IndexParam& param,
                   unsigned max_degree = 20,
                   float sample_rate = 0.3,
                   bool allocate = true);

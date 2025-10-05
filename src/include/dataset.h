@@ -16,15 +16,12 @@ namespace graph {
 [[maybe_unused]] std::vector<std::vector<unsigned int> >
 loadGroundTruth(const std::string& filename, unsigned int qsize, unsigned int K = 100);
 
-/* Default is L2 */
-enum class DISTANCE { L2, COSINE, JACCARD, HAMMING };
-
 class Dataset {
 private:
     std::string name_;
     std::string size_;
 
-    DISTANCE distance_;
+    metric::DISTANCE distance_;
 
     MatrixPtr<float> base_;
     MatrixPtr<float> query_;
@@ -55,7 +52,7 @@ public:
      * @return
      */
     static std::shared_ptr<Dataset>
-    getInstance(const std::string& base_path, DISTANCE metric, bool use_disk = false);
+    getInstance(const std::string& base_path, metric::DISTANCE metric, bool use_disk = false);
 
     /**
      * @brief Get the instance of the dataset
@@ -77,7 +74,7 @@ public:
     getInstance(const std::string& base_path,
                 const std::string& query_path,
                 const std::string& groundtruth_path,
-                DISTANCE metric,
+                metric::DISTANCE metric,
                 bool use_disk = false);
 
     std::string&
@@ -89,7 +86,7 @@ public:
     [[nodiscard]] Matrix<float>&
     getBase() const;
 
-    MatrixPtr<float>&
+    MatrixPtr<float>
     getBasePtr();
 
     [[nodiscard]] Matrix<float>&
@@ -98,13 +95,13 @@ public:
     [[nodiscard]] Matrix<int>&
     getGroundTruth() const;
 
-    OraclePtr&
+    OraclePtr
     getOracle();
 
-    DISTANCE&
+    metric::DISTANCE&
     getDistance();
 
-    VisitedListPoolPtr&
+    VisitedListPoolPtr
     getVisitedListPool();
 
     /**

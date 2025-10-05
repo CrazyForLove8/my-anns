@@ -2,40 +2,19 @@
 
 using namespace graph;
 
-hnsw::HNSW::HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction)
+hnsw::HNSW::HNSW(const IndexParam& param, const int max_neighbors, const int ef_construction)
     : max_neighbors_(max_neighbors),
       max_base_neighbors_(max_neighbors * 2),
       ef_construction_(ef_construction),
-      Index(dataset, false) {
+      Index(param, false) {
     visited_table_ = std::unordered_set<int>();
     random_engine_.seed(2024);
     reverse_ = 1 / log(1.0 * max_neighbors_);
-
-    levels_.reserve(oracle_->size());
-    levels_.resize(oracle_->size(), 0);
-
-    logger << "Building HNSW index with parameters:" << std::endl;
-    logger << "max_neighbors: " << max_neighbors_ << std::endl;
-    logger << "ef_construction: " << ef_construction_ << std::endl;
-    logger << "dataset size: " << oracle_->size() << std::endl;
-
-    int total = oracle_->size();
-
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    for (int i = 0; i < total; i++) {
-        levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
-        max_level_ = std::max(max_level_, levels_[i]);
-    }
-
-    graph_.reserve(max_level_ + 1);
-    for (int i = 0; i <= max_level_; ++i) {
-        graph_.emplace_back(total);
-    }
 }
 
 hnsw::HNSW::HNSW(
-    DatasetPtr& dataset, HGraph& graph, bool partial, int max_neighbors, int ef_construction)
-    : Index(dataset, false),
+    const IndexParam& param, HGraph& graph, bool partial, int max_neighbors, int ef_construction)
+    : Index(param, false),
       graph_(std::move(graph)),
       max_neighbors_(max_neighbors),
       max_base_neighbors_(max_neighbors * 2),
@@ -81,61 +60,6 @@ hnsw::HNSW::HNSW(
     }
 }
 
-hnsw::HNSW::HNSW(DatasetPtr& dataset, const std::string& index_file) : Index(dataset, false) {
-    auto params = loadHGraph(graph_, index_file, dataset_->getOracle());
-    if (params.find("save_point") != params.end()) {
-        cur_size_ = std::get<uint64_t>(params["save_point"]);
-    } else {
-        cur_size_ = graph_[0].size();
-    }
-    save_helper_.last_save_point = cur_size_;
-    if (params.find("max_neighbors") != params.end()) {
-        max_neighbors_ = std::get<uint64_t>(params["max_neighbors"]);
-        max_base_neighbors_ = max_neighbors_ * 2;
-    }
-    if (params.find("ef_construction") != params.end()) {
-        ef_construction_ = std::get<uint64_t>(params["ef_construction"]);
-    }
-    if (params.find("max_level") != params.end()) {
-        max_level_ = std::get<uint64_t>(params["max_level"]);
-    }
-    if (params.find("cur_max_level") != params.end()) {
-        cur_max_level_ = std::get<uint64_t>(params["cur_max_level"]);
-    }
-    if (params.find("enter_point") != params.end()) {
-        enter_point_ = std::get<uint64_t>(params["enter_point"]);
-    }
-    if (params.find("built") != params.end()) {
-        built_ = std::get<uint64_t>(params["built"]);
-        built_ = built_ && oracle_->size() == cur_size_;
-    }
-
-    random_engine_.seed(2024);
-    reverse_ = 1 / log(1.0 * max_neighbors_);
-
-    if (built_) {
-        flatten_graph_ = FlattenHGraph(graph_);
-    } else {
-        logger << "Graph unbuilt, initializing levels and graph structure." << std::endl;
-        levels_.reserve(oracle_->size());
-        levels_.resize(oracle_->size(), 0);
-
-        auto total = oracle_->size();
-
-        std::uniform_real_distribution<double> distribution(0.0, 1.0);
-        for (auto i = cur_size_; i < total; i++) {
-            levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
-            max_level_ = std::max(max_level_, levels_[i]);
-        }
-
-        graph_.reserve(max_level_ + 1);
-        graph_.resize(max_level_ + 1);
-        for (int i = 0; i <= max_level_; ++i) {
-            graph_[i].resize(total);
-        }
-    }
-}
-
 int
 hnsw::HNSW::seekPos(const Neighbors& vec) {
     int left = 0, right = vec.size() - 1;
@@ -168,33 +92,27 @@ hnsw::HNSW::addPoint(IdType index) {
 
     uint32_t cur_node_ = enter_point_;
     for (auto i = max_level_copy; i > level; --i) {
-        auto res = search_layer(oracle_.get(),
-                                visited_list_pool_.get(),
-                                graph_,
-                                i,
-                                (*oracle_)[index].get(),
-                                1,
-                                1,
-                                cur_node_);
+        auto res = search_hgraph_layer(
+            oracle_.get(), visited_list_pool_.get(), graph_, i, (*oracle_)[index], 1, 1, cur_node_);
         cur_node_ = res[0].id;
     }
 
     for (auto i = std::min(level, max_level_copy); i >= 0; --i) {
-        auto res = search_layer(oracle_.get(),
-                                visited_list_pool_.get(),
-                                graph_,
-                                i,
-                                (*oracle_)[index].get(),
-                                ef_construction_,
-                                ef_construction_,
-                                cur_node_);
+        auto res = search_hgraph_layer(oracle_.get(),
+                                       visited_list_pool_.get(),
+                                       graph_,
+                                       i,
+                                       (*oracle_)[index],
+                                       ef_construction_,
+                                       ef_construction_,
+                                       cur_node_);
 
         res.erase(std::remove_if(
                       res.begin(), res.end(), [index](const Neighbor& n) { return n.id == index; }),
                   res.end());
         res.erase(std::unique(res.begin(), res.end()), res.end());
 
-        auto cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
+        int cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
         prune(res, cur_max_cnt);
 
         auto& graph = graph_[i];
@@ -334,11 +252,11 @@ Neighbors
 hnsw::HNSW::search(const float* query, unsigned int topk, unsigned int L) const {
     unsigned cur_node_ = enter_point_;
     for (int i = flatten_graph_.size() - 1; i > 0; --i) {
-        auto res = graph::search(
+        auto res = search_flatten_graph(
             oracle_.get(), visited_list_pool_.get(), flatten_graph_[i], query, 1, 1, cur_node_);
         cur_node_ = res[0].id;
     }
-    auto res = graph::search(
+    auto res = search_flatten_graph(
         oracle_.get(), visited_list_pool_.get(), flatten_graph_[0], query, topk, L, cur_node_);
     return res;
 }
@@ -376,8 +294,9 @@ hnsw::HNSW::extract_hgraph() {
 }
 
 void
-hnsw::HNSW::build_internal() {
-    this->partial_build(1, oracle_->size());
+hnsw::HNSW::build_internal(DatasetPtr& dataset) {
+    const auto start = cur_size_ == 0 ? 1 : cur_size_;
+    this->partial_build(start, oracle_->size());
 }
 
 void
@@ -404,6 +323,25 @@ hnsw::HNSW::partial_build(IdType start, IdType end) {
     }
     timer.end();
     logger << "Adding time: " << timer.elapsed() << "s" << std::endl;
+}
+void
+hnsw::HNSW::resize(const IdType new_size) {
+    visited_list_pool_ = VisitedListPool::getInstance(new_size);
+
+    levels_.reserve(oracle_->size());
+    levels_.resize(oracle_->size(), 0);
+
+    auto total = oracle_->size();
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    for (auto i = cur_size_; i < total; i++) {
+        levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels_[i]);
+    }
+
+    graph_.reserve(max_level_ + 1);
+    for (auto i = graph_.size(); i <= max_level_; ++i) {
+        graph_.emplace_back(total);
+    }
 }
 
 void
@@ -440,17 +378,20 @@ hnsw::HNSW::partial_build(IdType num) {
 }
 
 void
-hnsw::HNSW::build() {
+hnsw::HNSW::build(DatasetPtr& dataset) {
     print_info();
     if (built_) {
         logger << "Index is already built, skipping build." << std::endl;
         return;
     }
 
+    oracle_->insert(dataset->getBasePtr());
+    this->resize(oracle_->size());
+
     Timer timer;
     timer.start();
 
-    build_internal();
+    build_internal(dataset);
 
     timer.end();
     logger << "Indexing time: " << timer.elapsed() << "s" << std::endl;
@@ -470,24 +411,9 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
     Timer timer;
     timer.start();
 
-    auto cur_size = oracle_->size();
+    auto cur_size = cur_size_;
     auto total = dataset->getOracle()->size() + cur_size;
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    levels_.reserve(total);
-    levels_.resize(total);
-    for (auto i = cur_size; i < total; i++) {
-        levels_[i] = (uint8_t)(-log(distribution(random_engine_)) * reverse_);
-        max_level_ = std::max(max_level_, levels_[i]);
-    }
-    graph_.resize(max_level_ + 1);
-    for (auto& level : graph_) {
-        level.resize(total);
-    }
-
-    {
-        std::vector<DatasetPtr> datasets = {dataset};
-        dataset_->merge(datasets);
-    }
+    oracle_->insert(dataset->getBasePtr());
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = cur_size; i < total; ++i) {

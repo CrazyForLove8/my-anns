@@ -1,8 +1,8 @@
 #include "nnmerge.h"
 
 nnmerge::NNMerge::NNMerge(
-    DatasetPtr& dataset, int K_, float rho, float delta, int iteration, float alpha)
-    : NNDescent(dataset, K_, rho, delta, iteration), alpha(alpha) {
+    const IndexParam& param, int K_, float rho, float delta, int iteration, float alpha)
+    : NNDescent(param, K_, rho, delta, iteration), alpha(alpha) {
 }
 
 void
@@ -125,7 +125,7 @@ nnmerge::NNMerge::mergeGraph(Graph& G_v) {
 }
 
 void
-nnmerge::NNMerge::build_internal() {
+nnmerge::NNMerge::build_internal(DatasetPtr& dataset) {
     throw std::runtime_error("Not implemented, please use combine instead");
 }
 

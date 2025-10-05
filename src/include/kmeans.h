@@ -32,7 +32,7 @@ private:
     static int maxIteration_;
     float threshold_{1e-3};
 
-    OraclePtr& oracle_;
+    OraclePtr oracle_;
 
     void
     Init();
@@ -44,7 +44,7 @@ private:
     Center();
 
 public:
-    Kmeans(DatasetPtr& dataset, uint8_t k, float threshold = 1e-4);
+    Kmeans(const DatasetPtr& dataset, uint8_t k, float threshold = 1e-4);
 
     /**
      * Get the ell nearest centers of the p

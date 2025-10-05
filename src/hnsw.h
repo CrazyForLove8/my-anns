@@ -64,23 +64,24 @@ protected:
     prune(Neighbors& candidates, int max_neighbors);
 
     void
-    build_internal() override;
+    build_internal(DatasetPtr& dataset) override;
 
     void
     partial_build(IdType start, IdType end) override;
 
+    void
+    resize(IdType new_size) override;
+
 public:
     uint32_t enter_point_{};
 
-    HNSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
+    HNSW(const IndexParam& param, int max_neighbors, int ef_construction);
 
-    HNSW(DatasetPtr& dataset,
+    HNSW(const IndexParam& param,
          HGraph& graph,
          bool partial = false,
          int max_neighbors = 32,
          int ef_construction = 200);
-
-    HNSW(DatasetPtr& dataset, const std::string& index_file);
 
     ~HNSW() override = default;
 
@@ -94,7 +95,7 @@ public:
     set_cur_size(IdType cur_size);
 
     void
-    build() override;
+    build(DatasetPtr& dataset) override;
 
     void
     partial_build(IdType num) override;

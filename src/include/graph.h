@@ -29,6 +29,8 @@
 
 namespace graph {
 
+inline int seed = 2024;
+
 struct Node {
     IdType id;
     float distance;
@@ -205,6 +207,9 @@ insert_into_pool(Neighbor* addr, int size, const Neighbor& nn) {
     addr[right] = nn;
     return right;
 }
+
+int
+seekPos(const Neighbors& vec);
 
 Neighbors
 knn_search(IndexOracle<float>* oracle,

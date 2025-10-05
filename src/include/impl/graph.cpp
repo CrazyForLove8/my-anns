@@ -3,8 +3,6 @@
 
 using namespace graph;
 
-int seed = 2024;
-
 Node::Node(IdType i, float d) {
     id = i;
     distance = d;
@@ -173,7 +171,7 @@ FlattenHGraph::size() const {
 
 // find the first -1 in the vector
 int
-seekPos(const Neighbors& vec) {
+graph::seekPos(const Neighbors& vec) {
     int left = 0, right = vec.size() - 1;
     if (vec.back().id != std::numeric_limits<IdType>::max()) {
         return right;

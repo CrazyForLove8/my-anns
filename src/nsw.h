@@ -26,13 +26,13 @@ private:
         const Graph& graph, const IndexOracle<float>& oracle, unsigned query, int attempts, int k);
 
     void
-    build_internal() override;
+    build_internal(DatasetPtr& dataset) override;
 
 public:
-    NSW(DatasetPtr& dataset, int max_neighbors, int ef_construction);
+    NSW(const IndexParam& param, int max_neighbors, int ef_construction);
 
     void
-    add(graph::DatasetPtr& dataset) override;
+    add(DatasetPtr& dataset) override;
 
     ~NSW() override = default;
 

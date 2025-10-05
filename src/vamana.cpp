@@ -1,7 +1,7 @@
 #include "vamana.h"
 
-diskann::Vamana::Vamana(DatasetPtr& dataset, float alpha, int L, int R)
-    : Index(dataset), alpha_(alpha), L_(L), R_(R) {
+diskann::Vamana::Vamana(const IndexParam& param, float alpha, int L, int R)
+    : Index(param), alpha_(alpha), L_(L), R_(R) {
     std::mt19937 rng(std::random_device{}());
 
 #pragma omp parallel for schedule(dynamic, 1024)
@@ -22,7 +22,7 @@ diskann::Vamana::Vamana(DatasetPtr& dataset, float alpha, int L, int R)
     for (auto i = 0; i < oracle_->size(); ++i) {
         auto pt = (*oracle_)[i];
         for (unsigned j = 0; j < oracle_->dim(); ++j) {
-            center[j] += pt.get()[j];
+            center[j] += pt[j];
         }
     }
     for (unsigned i = 0; i < oracle_->dim(); ++i) {
@@ -39,8 +39,8 @@ diskann::Vamana::Vamana(DatasetPtr& dataset, float alpha, int L, int R)
 }
 
 diskann::Vamana::Vamana(
-    DatasetPtr& dataset, std::vector<IdType>& permutation, float alpha, int L, int R)
-    : Index(dataset), alpha_(alpha), L_(L), R_(R) {
+    const IndexParam& param, std::vector<IdType>& permutation, float alpha, int L, int R)
+    : Index(param), alpha_(alpha), L_(L), R_(R) {
     auto n = permutation.size();
     std::mt19937 rng(std::random_device{}());
     for (int u = 0; u < n; ++u) {
@@ -60,7 +60,7 @@ diskann::Vamana::Vamana(
     for (unsigned i = 0; i < n; ++i) {
         auto pt = (*oracle_)[permutation[i]];
         for (unsigned j = 0; j < oracle_->dim(); ++j) {
-            center[j] += pt.get()[j];
+            center[j] += pt[j];
         }
     }
     for (unsigned i = 0; i < oracle_->dim(); ++i) {
@@ -128,12 +128,8 @@ diskann::Vamana::partial_build(graph::IdType start, graph::IdType end) {
         if (i % (permutation.size() / 10) == 0) {
             logger << "Processing " << i << " / " << graph_.size() << std::endl;
         }
-        auto res = track_search(oracle_.get(),
-                                visited_list_pool_.get(),
-                                graph_,
-                                (*oracle_)[permutation[i]].get(),
-                                L_,
-                                root);
+        auto res = search_one_graph_track(
+            oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[permutation[i]], L_, root);
         res.erase(
             std::remove_if(
                 res.begin(), res.end(), [&](const Neighbor& n) { return n.id == permutation[i]; }),
@@ -160,7 +156,7 @@ diskann::Vamana::partial_build(graph::IdType num) {
 }
 
 void
-diskann::Vamana::build_internal() {
+diskann::Vamana::build_internal(DatasetPtr& dataset) {
     this->partial_build(0, oracle_->size());
 }
 
@@ -171,12 +167,8 @@ diskann::Vamana::partial_build(std::vector<IdType>& permutation) {
         if (i % 10000 == 0) {
             logger << "Processing " << i << " / " << permutation.size() << std::endl;
         }
-        auto res = track_search(oracle_.get(),
-                                visited_list_pool_.get(),
-                                graph_,
-                                (*oracle_)[permutation[i]].get(),
-                                L_,
-                                root);
+        auto res = search_one_graph_track(
+            oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[permutation[i]], L_, root);
         {
             std::lock_guard<std::mutex> guard(graph_[permutation[i]].lock_);
             RobustPrune(1.0f, permutation[i], res);
@@ -213,13 +205,13 @@ diskann::Vamana::extract_params() {
     return params;
 }
 
-diskann::DiskANN::DiskANN(DatasetPtr& dataset, float alpha, int L, int R, int k, int ell)
-    : Index(dataset), alpha_(alpha), L_(L), R_(R), k_(k), ell_(ell) {
+diskann::DiskANN::DiskANN(const IndexParam& param, float alpha, int L, int R, int k, int ell)
+    : Index(param), alpha_(alpha), L_(L), R_(R), k_(k), ell_(ell) {
 }
 
 void
-diskann::DiskANN::build_internal() {
-    auto kmeans = std::make_shared<Kmeans>(dataset_, k_);
+diskann::DiskANN::build_internal(DatasetPtr& dataset) {
+    const auto kmeans = std::make_shared<Kmeans>(dataset, k_);
     kmeans->Run();
 
     std::mt19937 rng(std::random_device{}());
@@ -235,7 +227,7 @@ diskann::DiskANN::build_internal() {
             }
         }
         std::shuffle(permutation.begin(), permutation.end(), rng);
-        auto vamana = std::make_shared<Vamana>(dataset_, permutation, alpha_, L_, R_);
+        auto vamana = std::make_shared<Vamana>(index_param_, permutation, alpha_, L_, R_);
         logger << "Constructing sub-index for cluster " << k << " with " << permutation.size()
                << " points." << std::endl;
         vamana->partial_build(permutation);

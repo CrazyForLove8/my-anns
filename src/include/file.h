@@ -8,6 +8,7 @@
 #include <csignal>
 
 #include "fstream"
+#include "io.h"
 #include "list"
 #include "memory"
 #include "stdexcept"
@@ -17,6 +18,31 @@
 #include "vector"
 
 namespace graph {
+
+struct SaveHelper {
+    uint8_t save_frequency{0};
+    std::string save_path;
+
+    uint64_t save_per_count{0};
+    uint64_t total_count{0};
+    uint64_t last_save_point{0};
+
+    [[nodiscard]] bool
+    is_enabled() const {
+        return save_frequency > 0 && !save_path.empty();
+    }
+
+    [[nodiscard]] uint64_t
+    get_interval() const {
+        return save_per_count > 0 ? save_per_count : ((save_frequency + 1) * 100000000);
+    }
+
+    [[nodiscard]] bool
+    should_save(uint64_t u) const {
+        return is_enabled() && u % get_interval() == 0 && u > last_save_point &&
+               u + save_per_count <= total_count;
+    }
+};
 
 struct FileReaderParams {
     size_t begin_offset{0};  // for bin file, the first 8 bytes are size and dim
@@ -108,6 +134,17 @@ public:
 
         return cache_[idx].data;
     }
+};
+
+class FileIO : public IO {
+public:
+    DataPtr
+    read(uint64_t size, uint64_t offset) override;
+
+    void
+    write(const DataPtr& data, uint64_t size, uint64_t offset) override;
+
+    ~FileIO() override = default;
 };
 
 }  // namespace graph

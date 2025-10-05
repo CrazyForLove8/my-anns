@@ -1,7 +1,7 @@
 #include "nsg.h"
 
-nsg::NSG::NSG(DatasetPtr& dataset, unsigned int K, unsigned int L, unsigned int m)
-    : Index(dataset), L_(L), m_(m), K_(K) {
+nsg::NSG::NSG(const IndexParam& param, unsigned int K, unsigned int L, unsigned int m)
+    : Index(param), L_(L), m_(m), K_(K) {
 }
 
 //TODO Extract pruning strategy to a separate class like metrics
@@ -60,8 +60,8 @@ nsg::NSG::tree() {
                 continue;
             }
             built = false;
-            auto candidates = track_search(
-                oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[i].get(), L_, root);
+            auto candidates = search_one_graph_track(
+                oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[i], L_, root);
             bool added = false;
             int idx = 0;
             for (auto& candidate : candidates) {
@@ -91,10 +91,10 @@ nsg::NSG::tree() {
 }
 
 void
-nsg::NSG::build_internal() {
+nsg::NSG::build_internal(DatasetPtr& dataset) {
     {
-        nndescent::NNDescent nnd(dataset_, K_);
-        nnd.build();
+        nndescent::NNDescent nnd(index_param_, K_);
+        nnd.build(dataset);
         graph_ = std::move(nnd.extract_graph());
     }
 
@@ -103,13 +103,14 @@ nsg::NSG::build_internal() {
         for (unsigned i = 0; i < oracle_->size(); ++i) {
             auto pt = (*oracle_)[i];
             for (unsigned j = 0; j < oracle_->dim(); ++j) {
-                center[j] += pt.get()[j];
+                center[j] += pt[j];
             }
         }
         for (unsigned i = 0; i < oracle_->dim(); ++i) {
             center[i] /= oracle_->size();
         }
-        root = knn_search(oracle_.get(), visited_list_pool_.get(), graph_, center, 1, L_)[0].id;
+        root =
+            search_one_graph(oracle_.get(), visited_list_pool_.get(), graph_, center, 1, L_)[0].id;
         delete[] center;
     }
 
@@ -120,8 +121,8 @@ nsg::NSG::build_internal() {
         if (u % 10000 == 0) {
             logger << "Adding " << u << " / " << graph_.size() << std::endl;
         }
-        std::vector<Neighbor> candidates = track_search(
-            oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u].get(), L_, root);
+        std::vector<Neighbor> candidates = search_one_graph_track(
+            oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[u], L_, root);
         candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
         candidates.erase(
             std::remove_if(
@@ -138,7 +139,7 @@ nsg::NSG::build_internal() {
 
 Neighbors
 nsg::NSG::search(const float* query, unsigned int topk, unsigned int L) const {
-    return graph::search(
+    return search_flatten_graph(
         oracle_.get(), visited_list_pool_.get(), flatten_graph_, query, topk, L, root);
 }
 void

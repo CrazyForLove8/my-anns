@@ -1,4 +1,4 @@
-#include "annslib.h"
+#include "../annslib.h"
 
 int
 main() {

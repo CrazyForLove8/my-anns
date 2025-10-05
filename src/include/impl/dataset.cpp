@@ -16,7 +16,7 @@ Dataset::getInstance(const std::string& name, const std::string& size, bool use_
 }
 
 std::shared_ptr<Dataset>
-Dataset::getInstance(const std::string& base_path, DISTANCE metric, bool use_disk) {
+Dataset::getInstance(const std::string& base_path, metric::DISTANCE metric, bool use_disk) {
     auto dataset = std::make_shared<Dataset>();
     dataset->name_ =
         base_path.substr(base_path.find_last_of("/\\") + 1,
@@ -26,15 +26,15 @@ Dataset::getInstance(const std::string& base_path, DISTANCE metric, bool use_dis
     dataset->base_->load(base_path, use_disk);
 
     switch (metric) {
-        case DISTANCE::L2:
+        case metric::DISTANCE::L2:
             dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(dataset->base_);
             break;
-        case DISTANCE::COSINE:
+        case metric::DISTANCE::COSINE:
             dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(dataset->base_);
             break;
-        case DISTANCE::JACCARD:
+        case metric::DISTANCE::JACCARD:
             throw std::runtime_error("Jaccard distance is currently not supported");
-        case DISTANCE::HAMMING:
+        case metric::DISTANCE::HAMMING:
             throw std::runtime_error("Hamming distance is currently not supported");
     }
 
@@ -48,7 +48,7 @@ std::shared_ptr<Dataset>
 Dataset::getInstance(const std::string& base_path,
                      const std::string& query_path,
                      const std::string& groundtruth_path,
-                     DISTANCE metric,
+                     metric::DISTANCE metric,
                      bool use_disk) {
     auto dataset = std::make_shared<Dataset>();
     dataset->name_ =
@@ -62,15 +62,15 @@ Dataset::getInstance(const std::string& base_path,
     dataset->groundTruth_->load(groundtruth_path);
 
     switch (metric) {
-        case DISTANCE::L2:
+        case metric::DISTANCE::L2:
             dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(dataset->base_);
             break;
-        case DISTANCE::COSINE:
+        case metric::DISTANCE::COSINE:
             dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(dataset->base_);
             break;
-        case DISTANCE::JACCARD:
+        case metric::DISTANCE::JACCARD:
             throw std::runtime_error("Jaccard distance is currently not supported");
-        case DISTANCE::HAMMING:
+        case metric::DISTANCE::HAMMING:
             throw std::runtime_error("Hamming distance is currently not supported");
     }
 
@@ -85,7 +85,7 @@ Dataset::Dataset() {
     query_ = std::make_shared<Matrix<float> >();
     groundTruth_ = std::make_shared<Matrix<int> >();
 
-    distance_ = DISTANCE::L2;
+    distance_ = metric::DISTANCE::L2;
     oracle_ = nullptr;
     full_dataset_ = false;
     visited_list_pool_ = nullptr;
@@ -132,7 +132,7 @@ Dataset::load() {
 
     if (angular_datasets.find(name_) != angular_datasets.end()) {
         oracle_ = MatrixOracle<float, metric::angular>::getInstance(base_);
-        distance_ = DISTANCE::COSINE;
+        distance_ = metric::DISTANCE::COSINE;
     } else {
         oracle_ = MatrixOracle<float, metric::l2>::getInstance(base_);
     }
@@ -176,12 +176,12 @@ Dataset::getGroundTruth() const {
     return *groundTruth_;
 }
 
-OraclePtr&
+OraclePtr
 Dataset::getOracle() {
     return oracle_;
 }
 
-VisitedListPoolPtr&
+VisitedListPoolPtr
 Dataset::getVisitedListPool() {
     return visited_list_pool_;
 }
@@ -315,7 +315,7 @@ Dataset::aggregate(std::vector<DatasetPtr>& datasets) {
     auto dataset = std::make_shared<Dataset>();
     dataset->base_ = matrixPtr;
     dataset->distance_ = distance;
-    if (distance == DISTANCE::COSINE) {
+    if (distance == metric::DISTANCE::COSINE) {
         dataset->oracle_ = MatrixOracle<float, metric::angular>::getInstance(matrixPtr);
     } else {
         dataset->oracle_ = MatrixOracle<float, metric::l2>::getInstance(matrixPtr);
@@ -328,12 +328,12 @@ Dataset::aggregate(std::vector<DatasetPtr>& datasets) {
     return dataset;
 }
 
-DISTANCE&
+metric::DISTANCE&
 Dataset::getDistance() {
     return distance_;
 }
 
-MatrixPtr<float>&
+MatrixPtr<float>
 Dataset::getBasePtr() {
     return base_;
 }

@@ -1,10 +1,10 @@
 #include "evaluator.h"
 
-#include "hnsw.h"
-#include "mgraph.h"
+#include "../hnsw.h"
+#include "../mgraph.h"
 
 #ifndef MULTITHREAD
-#define MULTITHREAD 1
+#define MULTITHREAD 0
 #endif
 
 void

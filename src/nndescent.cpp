@@ -1,7 +1,8 @@
 #include "nndescent.h"
 
-nndescent::NNDescent::NNDescent(DatasetPtr& dataset, int K, float rho, float delta, int iteration)
-    : Index(dataset), K_(K), rho_(rho), delta_(delta), iteration_(iteration) {
+nndescent::NNDescent::NNDescent(
+    const IndexParam& param, int K, float rho, float delta, int iteration)
+    : Index(param), K_(K), rho_(rho), delta_(delta), iteration_(iteration) {
 }
 
 void
@@ -137,7 +138,7 @@ nndescent::NNDescent::clearGraph() {
 }
 
 void
-nndescent::NNDescent::build_internal() {
+nndescent::NNDescent::build_internal(DatasetPtr& dataset) {
     int sample = static_cast<int>(static_cast<float>(K_) * rho_);
     initializeGraph();
     for (size_t it = 0; it < iteration_; ++it) {

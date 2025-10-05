@@ -18,9 +18,9 @@ class NNMerge : public NNDescent {
 private:
     float alpha{0.5};
 
-    uint32_t graph_size_1;
+    uint32_t graph_size_1{};
 
-    uint32_t graph_size_2;
+    uint32_t graph_size_2{};
 
     void
     splitGraph(Graph& G_v, const Graph& knng1, const Graph& knng2);
@@ -35,13 +35,13 @@ private:
     mergeGraph(Graph& G_v);
 
     void
-    build_internal() override;
+    build_internal(DatasetPtr& dataset) override;
 
     int
     applyUpdate(unsigned int sample) override;
 
 public:
-    explicit NNMerge(DatasetPtr& dataset,
+    explicit NNMerge(const IndexParam& param,
                      int K,
                      float rho = 0.5,
                      float delta = 0.001,

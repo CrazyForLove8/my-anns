@@ -17,44 +17,25 @@
 #include "memory.h"
 #include "metric.h"
 #include "timer.h"
+#include "vectors.h"
 #include "visittable.h"
 
 using namespace graph;
 
-struct SaveHelper {
-    uint8_t save_frequency{0};
-    std::string save_path;
-
-    uint64_t save_per_count{0};
-    uint64_t total_count{0};
-    uint64_t last_save_point{0};
-
-    [[nodiscard]] bool
-    is_enabled() const {
-        return save_frequency > 0 && !save_path.empty();
-    }
-
-    [[nodiscard]] uint64_t
-    get_interval() const {
-        return save_per_count > 0 ? save_per_count : ((save_frequency + 1) * 100000000);
-    }
-
-    [[nodiscard]] bool
-    should_save(uint64_t u) const {
-        return is_enabled() && u % get_interval() == 0 && u > last_save_point &&
-               u + save_per_count <= total_count;
-    }
+struct IndexParam {
+    DimType dim_{0};
+    IdType init_size_{1000};
+    metric::DISTANCE metric_{metric::DISTANCE::L2};
+    IOType io_type_{IOType::FILE_IO};
 };
 
 class Index {
 protected:
     Graph graph_;
 
-    DatasetPtr dataset_;
+    IndexParam index_param_;
 
-    OraclePtr oracle_;
-
-    MatrixPtr<float> base_;
+    VectorsPtr<float> oracle_;
 
     VisitedListPoolPtr visited_list_pool_;
 
@@ -69,18 +50,16 @@ protected:
     SaveHelper save_helper_;
 
     virtual void
-    build_internal();
+    build_internal(DatasetPtr& dataset);
 
     virtual void
     partial_build(IdType start, IdType end);
 
+    virtual void
+    resize(IdType new_size);
+
 public:
-    Index();
-
-    // TODO In the future, we shall store the original vectors in the index
-    explicit Index(DatasetPtr& dataset, bool allocate = true);
-
-    explicit Index(DatasetPtr& dataset, Graph& graph);
+    explicit Index(const IndexParam& param, bool allocate = true);
 
     virtual ~Index() = default;
 
@@ -88,10 +67,7 @@ public:
     set_save_helper(const SaveHelper& saveHelper);
 
     virtual void
-    reset(DatasetPtr& dataset);
-
-    virtual void
-    build();
+    build(DatasetPtr& dataset);
 
     virtual void
     add(DatasetPtr& dataset);
@@ -108,11 +84,11 @@ public:
     virtual FlattenGraph&
     extract_flatten_graph();
 
-    virtual DatasetPtr&
-    extract_dataset();
-
     virtual ParamMap
     extract_params();
+
+    virtual VectorsPtr<float>
+    extract_vectors();
 
     virtual void
     load_params(const ParamMap& params);
@@ -132,21 +108,6 @@ public:
 };
 
 using IndexPtr = std::shared_ptr<Index>;
-
-class IndexWrapper : public Index {
-public:
-    // TODO replace graph with index_path
-    explicit IndexWrapper(DatasetPtr& dataset, Graph& graph);
-
-    explicit IndexWrapper(IndexPtr& index);
-
-    IndexWrapper() = default;
-
-    ~IndexWrapper() override = default;
-
-    void
-    append(std::vector<IndexPtr>& indexes);
-};
 
 // TODO Support IndexFactory
 

@@ -33,18 +33,18 @@ private:
     Graph& base_;
 
     void
-    build_internal() override;
+    build_internal(DatasetPtr& dataset) override;
 
 public:
     /**
-         * @brief Build a TauMNG graph.
-         * @param oracle
-         * @param graph
-         * @param t
-         * @param h
-         * @param b
-         */
-    TauMNG(DatasetPtr& dataset, Graph& base, float t, int h, int b);
+     * @brief Build a TauMNG graph.
+     * @param param
+     * @param base
+     * @param t
+     * @param h
+     * @param b
+     */
+    TauMNG(const IndexParam& param, Graph& base, float t, int h, int b);
 
     void
     set_b(int b);

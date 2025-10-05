@@ -2,7 +2,7 @@
 
 int Kmeans::maxIteration_ = 100;
 
-Kmeans::Kmeans(DatasetPtr& dataset, uint8_t k, float threshold)
+Kmeans::Kmeans(const DatasetPtr& dataset, const uint8_t k, const float threshold)
     : oracle_(dataset->getOracle()),
       k_(k),
       pointNumber_((int)dataset->getOracle()->size()),

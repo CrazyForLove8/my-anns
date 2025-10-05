@@ -10,6 +10,11 @@
 #define MYANNS_METRICS_H
 
 namespace graph::metric {
+
+using DistFunc = float (*)(const float*, const float*, unsigned);
+
+enum class DISTANCE { L2, COSINE, JACCARD, HAMMING };
+
 struct l2 {
     template <typename T>
     static float
@@ -23,6 +28,8 @@ struct l2 {
         return std::sqrt(r);
     }
 };
+
+inline auto l2_dist = &l2::apply<float>;
 
 struct angular {
     template <typename T>
@@ -39,6 +46,9 @@ struct angular {
         return 1 - dot / (std::sqrt(norm_x) * std::sqrt(norm_y));
     }
 };
+
+inline auto angular_dist = &angular::apply<float>;
+
 }  // namespace graph::metric
 
 #endif  // MYANNS_METRICS_H

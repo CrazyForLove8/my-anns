@@ -40,19 +40,16 @@ private:
     void
     heuristic(Neighbors& candidates, unsigned max_degree);
 
+    void
+    resize(IdType new_size) override;
+
 public:
     uint32_t enter_point_;
 
-    MGraph();
-
-    explicit MGraph(unsigned int max_degree, unsigned int ef_construction, float sample_rate = 0.3);
-
-    explicit MGraph(DatasetPtr& dataset,
+    explicit MGraph(const IndexParam& param,
                     unsigned int max_degree,
                     unsigned int ef_construction,
                     float sample_rate = 0.3);
-
-    explicit MGraph(DatasetPtr& dataset, const std::string& index_path);
 
     Graph&
     extract_graph() override;

@@ -484,8 +484,7 @@ main() {
     exp_multiple(dataset);
 
 #if ALARM_FINISHED
-    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
-    if (ret != 0) {
+    if (const int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav"); ret != 0) {
         std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
     }
 #endif

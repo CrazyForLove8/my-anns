@@ -35,17 +35,16 @@ private:
     unsigned K_;
 
     void
-    build_internal() override;
+    build_internal(DatasetPtr& dataset) override;
 
 public:
     /**
         * @brief Build an NSG. Note that the graph is destroyed after the build since std::move is called.
-        * @param oracle
-        * @param graph
+        * @param param
         * @param L search pool size
         * @param m maximum number of neighbors
         */
-    NSG(DatasetPtr& dataset, unsigned K, unsigned L, unsigned m);
+    NSG(const IndexParam& param, unsigned K, unsigned L, unsigned m);
 
     ~NSG() override = default;
 

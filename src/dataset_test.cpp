@@ -2,7 +2,7 @@
 // Created by XiaoWu on 2025/3/4.
 //
 
-#include "annslib.h"
+#include "../annslib.h"
 
 void
 testDataset() {
@@ -83,8 +83,8 @@ testAggregate() {
 
 void
 testSubset() {
-    auto dataset =
-        Dataset::getInstance("/root/mount/dataset/siftsmall/siftsmall_base.fvecs", DISTANCE::L2);
+    auto dataset = Dataset::getInstance("/root/mount/dataset/siftsmall/siftsmall_base.fvecs",
+                                        metric::DISTANCE::L2);
     std::cout << "The original dataset has " << dataset->getBase().size() << " points" << std::endl;
 
     for (auto& v : {2, 3, 4, 5, 6, 7}) {

@@ -1,7 +1,7 @@
 #include "taumng.h"
 
-taumng::TauMNG::TauMNG(DatasetPtr& dataset, Graph& base, float t, int h, int b)
-    : Index(dataset), t_(t), h_(h), b_(b), base_(base) {
+taumng::TauMNG::TauMNG(const IndexParam& param, Graph& base, float t, int h, int b)
+    : Index(param), t_(t), h_(h), b_(b), base_(base) {
 }
 
 void
@@ -74,14 +74,14 @@ taumng::TauMNG::print_info() const {
 //}
 
 void
-taumng::TauMNG::build_internal() {
+taumng::TauMNG::build_internal(DatasetPtr& dataset) {
 #pragma omp parallel for schedule(dynamic, 256)
     for (int u = 0; u < graph_.size(); ++u) {
         if (u % 10000 == 0) {
             logger << "Processing " << u << " / " << graph_.size() << std::endl;
         }
         auto H_u_ =
-            knn_search(oracle_.get(), visited_list_pool_.get(), base_, (*oracle_)[u].get(), h_, b_);
+            search_one_graph(oracle_.get(), visited_list_pool_.get(), base_, (*oracle_)[u], h_, b_);
         Neighbors candidates;
         for (auto& v : H_u_) {
             if (u == v.id) {

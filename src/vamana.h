@@ -36,7 +36,7 @@ private:
     RobustPrune(float alpha, IdType point, Neighbors& candidates);
 
     void
-    build_internal() override;
+    build_internal(DatasetPtr& dataset) override;
 
 public:
     /**
@@ -46,9 +46,9 @@ public:
      * @param L
      * @param R
      */
-    Vamana(DatasetPtr& dataset, float alpha, int L, int R);
+    Vamana(const IndexParam& param, float alpha, int L, int R);
 
-    Vamana(DatasetPtr& dataset, std::vector<IdType>& permutation, float alpha, int L, int R);
+    Vamana(const IndexParam& param, std::vector<IdType>& permutation, float alpha, int L, int R);
 
     ~Vamana() override = default;
 
@@ -90,10 +90,10 @@ private:
     int ell_;
 
     void
-    build_internal() override;
+    build_internal(DatasetPtr& dataset) override;
 
 public:
-    DiskANN(DatasetPtr& dataset, float alpha, int L, int R, int k, int ell);
+    DiskANN(const IndexParam& param, float alpha, int L, int R, int k, int ell);
 
     ~DiskANN() override = default;
 };

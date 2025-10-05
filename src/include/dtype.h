@@ -27,30 +27,6 @@
 #include "file.h"
 #include "logger.h"
 
-#ifdef __GNUC__
-#ifdef __AVX__
-#define ALIGNMENT 32
-#else
-#ifdef __SSE2__
-#define ALIGNMENT 16
-#else
-#define ALIGNMENT 4
-#endif
-#endif
-#endif
-
-#ifndef NO_MANUAL_VECTORIZATION
-#if (defined(__SSE__) || _M_IX86_FP > 0 || defined(_M_AMD64) || defined(_M_X64))
-#define USE_SSE
-#ifdef __AVX__
-#define USE_AVX
-#ifdef __AVX512F__
-#define USE_AVX512
-#endif
-#endif
-#endif
-#endif
-
 namespace graph {
 
 using IdType = uint32_t;

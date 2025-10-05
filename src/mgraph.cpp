@@ -1,78 +1,16 @@
 #include "mgraph.h"
 
-MGraph::MGraph()
-    : random_engine_(2024),
-      enter_point_(0),
-      max_level_(0),
-      cur_max_level_(0),
-      reverse_(1 / log(1.0 * 20)),
-      ef_construction_(200) {
-}
-
-MGraph::MGraph(unsigned int max_degree, unsigned int ef_construction, float sample_rate)
-    : FGIM(max_degree, sample_rate),
-      ef_construction_(ef_construction),
-      random_engine_(2024),
-      enter_point_(0),
-      max_level_(0),
-      cur_max_level_(0),
-      reverse_(1 / log(1.0 * max_degree)) {
-}
-
-MGraph::MGraph(DatasetPtr& dataset,
+MGraph::MGraph(const IndexParam& param,
                unsigned int max_degree,
                unsigned int ef_construction,
                float sample_rate)
-    : FGIM(dataset, max_degree, sample_rate, false),
+    : FGIM(param, max_degree, sample_rate, false),
       ef_construction_(ef_construction),
       random_engine_(2024),
       enter_point_(0),
       max_level_(0),
       cur_max_level_(0),
       reverse_(1 / log(1.0 * max_degree)) {
-}
-
-MGraph::MGraph(DatasetPtr& dataset, const std::string& index_path)
-    : FGIM(dataset, 20, 0.3, false),
-      random_engine_(2024),
-      enter_point_(0),
-      max_level_(0),
-      cur_max_level_(0) {
-    graph_.resize(1);
-    auto params = loadGraph(graph_[0], index_path, dataset->getOracle());
-    if (params.find("phase") != params.end()) {
-        cur_phase_ = std::get<std::string>(params["phase"]);
-        if (cur_phase_ == "1") {
-            if (params.find("save_point") != params.end()) {
-                start_id_ = std::get<uint64_t>(params["save_point"]);
-                save_helper_.last_save_point = start_id_;
-            }
-        } else if (cur_phase_ == "2") {
-            start_id_ = oracle_->size();
-        } else {
-            throw std::runtime_error("Unsupported phase: " + cur_phase_);
-        }
-        logger << "Start from Phase: " << cur_phase_ << std::endl;
-        logger << "Start ID: " << start_id_ << std::endl;
-    }
-    if (params.find("max_degree") != params.end()) {
-        max_degree_ = std::get<uint64_t>(params["max_degree"]);
-        max_base_degree_ = max_degree_ * 2;
-        reverse_ = 1 / log(1.0 * max_degree_);
-    }
-    if (params.find("sample_rate") != params.end()) {
-        sample_rate_ = std::get<double_t>(params["sample_rate"]);
-    }
-    if (params.find("ef_construction") != params.end()) {
-        ef_construction_ = std::get<uint64_t>(params["ef_construction"]);
-    }
-    if (params.find("built") != params.end()) {
-        built_ = std::get<uint64_t>(params["built"]);
-    }
-
-    if (built_) {
-        flatten_graph_ = FlattenHGraph(graph_);
-    }
 }
 
 Graph&
@@ -170,17 +108,17 @@ MGraph::CrossQuery(std::vector<IndexPtr>& indexes) {
     logger << "ef_construction: " << L << std::endl;
 #pragma omp parallel for schedule(dynamic)
     for (auto u = start_id_; u < oracle_->size(); ++u) {
-        auto cur_graph_idx =
+        const auto cur_graph_idx =
             std::upper_bound(offsets_.begin(), offsets_.end(), u) - offsets_.begin();
-        auto data = (*oracle_)[u];
+        const auto data = (*oracle_)[u];
 
         for (size_t graph_idx = 0; graph_idx < indexes.size(); graph_idx++) {
             if (graph_idx == cur_graph_idx) {
                 continue;
             }
-            auto _offset = graph_idx == 0 ? 0 : offsets_[graph_idx - 1];
-            auto& index = indexes[graph_idx];
-            auto result = index->search(data.get(), L, L);
+            const auto _offset = graph_idx == 0 ? 0 : offsets_[graph_idx - 1];
+            const auto& index = indexes[graph_idx];
+            auto result = index->search(data, L, L);
             for (auto&& res : result) {
                 graph_[0][u].pushHeap(res.id + _offset, res.distance);
             }
@@ -255,6 +193,34 @@ MGraph::heuristic(Neighbors& candidates, unsigned max_degree) {
 }
 
 void
+MGraph::resize(IdType new_size) {
+    visited_list_pool_ = VisitedListPool::getInstance(new_size);
+
+    levels_.reserve(oracle_->size());
+    levels_.resize(oracle_->size(), 0);
+
+    auto total = oracle_->size();
+    std::uniform_real_distribution<double> distribution(0.0, 1.0);
+    for (auto i = cur_size_; i < total; i++) {
+        levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
+        max_level_ = std::max(max_level_, levels_[i]);
+    }
+
+    graph_.reserve(max_level_ + 1);
+    for (auto i = graph_.size(); i <= max_level_; ++i) {
+        graph_.emplace_back(total);
+    }
+
+    auto& base_layer = graph_[0];
+    for (auto i = cur_size_; i < total; ++i) {
+        base_layer[i].candidates_.reserve(max_base_degree_);
+        for (int level = 1; level <= levels_[i]; ++level) {
+            graph_[level][i].candidates_.reserve(max_degree_);
+        }
+    }
+}
+
+void
 MGraph::ReconstructHGraph() {
     Timer timer;
     timer.start();
@@ -275,26 +241,20 @@ MGraph::ReconstructHGraph() {
 
         uint32_t cur_node_ = enter_point_;
         for (auto i = max_level_copy; i > level; --i) {
-            auto res = search_layer(oracle_.get(),
-                                    visited_list_pool_.get(),
-                                    graph_,
-                                    i,
-                                    (*oracle_)[u].get(),
-                                    1,
-                                    1,
-                                    cur_node_);
+            auto res = search_hgraph_layer(
+                oracle_.get(), visited_list_pool_.get(), graph_, i, (*oracle_)[u], 1, 1, cur_node_);
             cur_node_ = res[0].id;
         }
 
         for (auto i = std::min(level, max_level_copy); i > 0; --i) {
-            auto res = search_layer(oracle_.get(),
-                                    visited_list_pool_.get(),
-                                    graph_,
-                                    i,
-                                    (*oracle_)[u].get(),
-                                    ef_construction_,
-                                    ef_construction_,
-                                    cur_node_);
+            auto res = search_hgraph_layer(oracle_.get(),
+                                           visited_list_pool_.get(),
+                                           graph_,
+                                           i,
+                                           (*oracle_)[u],
+                                           ef_construction_,
+                                           ef_construction_,
+                                           cur_node_);
 
             res.erase(std::remove_if(
                           res.begin(), res.end(), [u](const Neighbor& n) { return n.id == u; }),
@@ -325,41 +285,15 @@ MGraph::ReconstructHGraph() {
 
 void
 MGraph::combine(std::vector<IndexPtr>& indexes) {
-    if (dataset_ == nullptr) {
-        logger << "No dataset found, merging data from indexes" << std::endl;
-        std::vector<DatasetPtr> datasets;
-        for (auto& index : indexes) {
-            datasets.emplace_back(index->extract_dataset());
-        }
-
-        dataset_ = Dataset::aggregate(datasets);
-        oracle_ = dataset_->getOracle();
-        visited_list_pool_ = dataset_->getVisitedListPool();
-        base_ = dataset_->getBasePtr();
+    IdType total_size = 0;
+    for (const auto& index : indexes) {
+        const auto vec_ptr = index->extract_vectors();
+        oracle_->insert(vec_ptr, total_size);
+        total_size += vec_ptr->size();
     }
+    this->resize(total_size);
+
     print_info();
-
-    int total = oracle_->size();
-    std::uniform_real_distribution<double> distribution(0.0, 1.0);
-    levels_.reserve(total);
-    levels_.resize(total);
-    for (int i = 0; i < total; ++i) {
-        levels_[i] = (int)(-log(distribution(random_engine_)) * reverse_);
-        max_level_ = std::max(max_level_, levels_[i]);
-    }
-
-    graph_.reserve(max_level_ + 1);
-    for (int i = 0; i <= max_level_; ++i) {
-        graph_.emplace_back(total);
-    }
-
-    auto& base_layer = graph_[0];
-    for (int i = 0; i < total; ++i) {
-        base_layer[i].candidates_.reserve(max_base_degree_);
-        for (int level = 1; level <= levels_[i]; ++level) {
-            graph_[level][i].candidates_.reserve(max_degree_);
-        }
-    }
 
     Timer timer;
     timer.start();
@@ -389,11 +323,11 @@ Neighbors
 MGraph::search(const float* query, unsigned int topk, unsigned int L) const {
     unsigned cur_node_ = enter_point_;
     for (int i = flatten_graph_.size() - 1; i > 0; --i) {
-        auto res = graph::search(
+        auto res = search_flatten_graph(
             oracle_.get(), visited_list_pool_.get(), flatten_graph_[i], query, 1, 1, cur_node_);
         cur_node_ = res[0].id;
     }
-    auto res = graph::search(
+    auto res = search_flatten_graph(
         oracle_.get(), visited_list_pool_.get(), flatten_graph_[0], query, topk, L, cur_node_);
     return res;
 }
