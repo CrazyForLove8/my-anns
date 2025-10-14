@@ -14,7 +14,7 @@
 
 namespace diskann {
 class Vamana : public Index {
-private:
+protected:
     /**
        * alpha
        */
@@ -30,7 +30,7 @@ private:
        */
     int R_;
 
-    IdType root;
+    IdType root{};
 
     void
     RobustPrune(float alpha, IdType point, Neighbors& candidates);
@@ -38,17 +38,20 @@ private:
     void
     build_internal(DatasetPtr& dataset) override;
 
+    void
+    find_root();
+
+    void
+    resize(graph::IdType new_size) override;
+
 public:
     /**
      *
-     * @param dataset
      * @param alpha
      * @param L
      * @param R
      */
     Vamana(const IndexParam& param, float alpha, int L, int R);
-
-    Vamana(const IndexParam& param, std::vector<IdType>& permutation, float alpha, int L, int R);
 
     ~Vamana() override = default;
 
@@ -60,6 +63,9 @@ public:
 
     void
     set_R(int R);
+
+    void
+    add(graph::DatasetPtr& dataset) override;
 
     void
     partial_build(graph::IdType start, graph::IdType end) override;
@@ -75,6 +81,27 @@ public:
 
     ParamMap
     extract_params() override;
+};
+
+class ParlayVamana : public Vamana {
+    int theta_;
+
+    Graph reverse_graph_;
+
+    void
+    batch_insert(IdType start, IdType end);
+
+    void
+    build_internal(graph::DatasetPtr& dataset) override;
+
+    void
+    resize(graph::IdType new_size) override;
+
+public:
+    ParlayVamana(const IndexParam& param, float alpha, int L, int R, int theta = -1);
+
+    void
+    print_info() const override;
 };
 
 class DiskANN : public Index {

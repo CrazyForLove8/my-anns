@@ -41,27 +41,8 @@ protected:
     virtual void
     addPoint(IdType index);
 
-    Neighbors
-    searchLayer(
-        const Graph& graph, const float* query, size_t topk, size_t L, size_t entry_id) const;
-
-    /**
-   * This implementation follows the original paper.
-   * @param graph
-   * @param oracle
-   * @param query
-   * @param enter_point
-   * @param ef
-   * @return
-   */
-    Neighbors
-    searchLayer(Graph& graph, IndexOracle<float>& oracle, float* query, int enter_point, int ef);
-
-    static int
-    seekPos(const Neighbors& vec);
-
     void
-    prune(Neighbors& candidates, int max_neighbors);
+    prune(Neighbors& candidates, IdType max_neighbors);
 
     void
     build_internal(DatasetPtr& dataset) override;
@@ -90,9 +71,6 @@ public:
 
     void
     set_ef_construction(int ef_construction);
-
-    void
-    set_cur_size(IdType cur_size);
 
     void
     build(DatasetPtr& dataset) override;
@@ -124,6 +102,28 @@ public:
     void
     print_info() const override;
 };
+
+class ParlayHNSW : public HNSW {
+    int theta_;
+
+    Graph reverse_graph_;
+
+    void
+    batch_insert(IdType start, IdType end);
+
+    void
+    build_internal(graph::DatasetPtr& dataset) override;
+
+    void
+    resize(graph::IdType new_size) override;
+
+public:
+    ParlayHNSW(const IndexParam& param, int M, int ef_construction, int theta = -1);
+
+    void
+    print_info() const override;
+};
+
 }  // namespace hnsw
 
 #endif  // MYANNS_HNSW_H

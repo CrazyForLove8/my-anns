@@ -2,78 +2,6 @@
 
 diskann::Vamana::Vamana(const IndexParam& param, float alpha, int L, int R)
     : Index(param), alpha_(alpha), L_(L), R_(R) {
-    std::mt19937 rng(std::random_device{}());
-
-#pragma omp parallel for schedule(dynamic, 1024)
-    for (auto u = 0; u < oracle_->size(); ++u) {
-        std::uniform_int_distribution<IdType> distrib(0, oracle_->size() - 1);
-        for (int i = 0; i < R_; ++i) {
-            auto v = distrib(rng);
-            if (u == v) {
-                continue;
-            }
-            float dist = (*oracle_)(u, v);
-            graph_[u].candidates_.emplace_back(v, dist, false);
-        }
-        std::sort(graph_[u].candidates_.begin(), graph_[u].candidates_.end());
-    }
-
-    std::vector<float> center(oracle_->dim(), 0);
-    for (auto i = 0; i < oracle_->size(); ++i) {
-        auto pt = (*oracle_)[i];
-        for (unsigned j = 0; j < oracle_->dim(); ++j) {
-            center[j] += pt[j];
-        }
-    }
-    for (unsigned i = 0; i < oracle_->dim(); ++i) {
-        center[i] /= static_cast<float>(oracle_->size());
-    }
-    float minimum = std::numeric_limits<float>::max();
-    for (auto x = 0; x < oracle_->size(); ++x) {
-        auto dist = (*oracle_)(x, center.data());
-        if (dist < minimum) {
-            minimum = dist;
-            root = x;
-        }
-    }
-}
-
-diskann::Vamana::Vamana(
-    const IndexParam& param, std::vector<IdType>& permutation, float alpha, int L, int R)
-    : Index(param), alpha_(alpha), L_(L), R_(R) {
-    auto n = permutation.size();
-    std::mt19937 rng(std::random_device{}());
-    for (int u = 0; u < n; ++u) {
-        for (int i = 0; i < R_; ++i) {
-            auto v = permutation[rng() % n];
-            if (permutation[u] == v) {
-                continue;
-            }
-            float dist = (*oracle_)(permutation[u], v);
-            graph_[permutation[u]].candidates_.emplace_back(v, dist, false);
-        }
-        std::sort(graph_[permutation[u]].candidates_.begin(),
-                  graph_[permutation[u]].candidates_.end());
-    }
-
-    std::vector<float> center(oracle_->dim(), 0);
-    for (unsigned i = 0; i < n; ++i) {
-        auto pt = (*oracle_)[permutation[i]];
-        for (unsigned j = 0; j < oracle_->dim(); ++j) {
-            center[j] += pt[j];
-        }
-    }
-    for (unsigned i = 0; i < oracle_->dim(); ++i) {
-        center[i] /= static_cast<float>(n);
-    }
-    auto minimum = std::numeric_limits<float>::max();
-    for (int x = 0; x < n; ++x) {
-        auto dist = (*oracle_)(permutation[x], center.data());
-        if (dist < minimum) {
-            minimum = dist;
-            root = permutation[x];
-        }
-    }
 }
 
 void
@@ -119,6 +47,22 @@ diskann::Vamana::RobustPrune(float alpha, IdType point, Neighbors& candidates) {
 
 void
 diskann::Vamana::partial_build(graph::IdType start, graph::IdType end) {
+    std::mt19937 rng(std::random_device{}());
+
+#pragma omp parallel for schedule(dynamic, 1024)
+    for (auto u = start; u < end; ++u) {
+        std::uniform_int_distribution<IdType> distrib(0, oracle_->size() - 1);
+        for (int i = 0; i < R_; ++i) {
+            auto v = distrib(rng);
+            if (u == v) {
+                continue;
+            }
+            float dist = (*oracle_)(u, v);
+            graph_[u].candidates_.emplace_back(v, dist, false);
+        }
+        std::sort(graph_[u].candidates_.begin(), graph_[u].candidates_.end());
+    }
+
     std::vector<int> permutation(end - start);
     std::iota(permutation.begin(), permutation.end(), start);
     std::shuffle(permutation.begin(), permutation.end(), std::mt19937(std::random_device()()));
@@ -204,6 +148,39 @@ diskann::Vamana::extract_params() {
     params["R"] = (uint64_t)R_;
     return params;
 }
+void
+diskann::Vamana::add(DatasetPtr& dataset) {
+    //TODO
+    Index::add(dataset);
+}
+
+void
+diskann::Vamana::find_root() {
+    std::vector<float> center(oracle_->dim(), 0);
+    for (auto i = 0; i < oracle_->size(); ++i) {
+        auto pt = (*oracle_)[i];
+        for (unsigned j = 0; j < oracle_->dim(); ++j) {
+            center[j] += pt[j];
+        }
+    }
+    for (unsigned i = 0; i < oracle_->dim(); ++i) {
+        center[i] /= static_cast<float>(oracle_->size());
+    }
+    float minimum = std::numeric_limits<float>::max();
+    for (auto x = 0; x < oracle_->size(); ++x) {
+        auto dist = (*oracle_)(x, center.data());
+        if (dist < minimum) {
+            minimum = dist;
+            root = x;
+        }
+    }
+}
+
+void
+diskann::Vamana::resize(graph::IdType new_size) {
+    Index::resize(new_size);
+    find_root();
+}
 
 diskann::DiskANN::DiskANN(const IndexParam& param, float alpha, int L, int R, int k, int ell)
     : Index(param), alpha_(alpha), L_(L), R_(R), k_(k), ell_(ell) {
@@ -227,9 +204,11 @@ diskann::DiskANN::build_internal(DatasetPtr& dataset) {
             }
         }
         std::shuffle(permutation.begin(), permutation.end(), rng);
-        auto vamana = std::make_shared<Vamana>(index_param_, permutation, alpha_, L_, R_);
+        auto vamana = std::make_shared<Vamana>(index_param_, alpha_, L_, R_);
         logger << "Constructing sub-index for cluster " << k << " with " << permutation.size()
                << " points." << std::endl;
+
+        // FIXME here we did not insert the vectors into vamana's oracle
         vamana->partial_build(permutation);
         indexes.emplace_back(vamana);
     }
@@ -246,4 +225,77 @@ diskann::DiskANN::build_internal(DatasetPtr& dataset) {
     for (int i = 0; i < oracle_->size(); ++i) {
         std::sort(graph_[i].candidates_.begin(), graph_[i].candidates_.end());
     }
+}
+
+void
+diskann::ParlayVamana::batch_insert(IdType start, IdType end) {
+#pragma omp parallel for schedule(dynamic)
+    for (auto i = start; i < end; ++i) {
+        auto res = search_one_graph_track<true>(
+            oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[i], L_, root);
+        res.erase(
+            std::remove_if(res.begin(), res.end(), [&](const Neighbor& n) { return n.id == i; }),
+            res.end());
+        RobustPrune(1.0f, i, res);
+    }
+
+#pragma omp parallel for schedule(dynamic)
+    for (auto u = start; u < end; ++u) {
+        if (graph_[u].candidates_.empty()) {
+            continue;
+        }
+        for (auto& v : graph_[u].candidates_) {
+            std::lock_guard<std::mutex> guard(reverse_graph_[v.id].lock_);
+            reverse_graph_[v.id].candidates_.emplace_back(u, v.distance, false);
+        }
+    }
+
+#pragma omp parallel for schedule(dynamic)
+    for (int u = 0; u < reverse_graph_.size(); ++u) {
+        if (reverse_graph_[u].candidates_.empty()) {
+            continue;
+        }
+        graph_[u].candidates_.insert(graph_[u].candidates_.end(),
+                                     reverse_graph_[u].candidates_.begin(),
+                                     reverse_graph_[u].candidates_.end());
+        reverse_graph_[u].candidates_.clear();
+        std::sort(graph_[u].candidates_.begin(), graph_[u].candidates_.end());
+        if (graph_[u].candidates_.size() > R_) {
+            Neighbors tmp;
+            RobustPrune(alpha_, u, tmp);
+        }
+    }
+}
+
+void
+diskann::ParlayVamana::print_info() const {
+    Vamana::print_info();
+    logger << "Theta: " << theta_ << std::endl;
+}
+
+diskann::ParlayVamana::ParlayVamana(const IndexParam& param, float alpha, int L, int R, int theta)
+    : Vamana(param, alpha, L, R), theta_(theta) {
+}
+
+void
+diskann::ParlayVamana::build_internal(DatasetPtr& dataset) {
+    if (theta_ <= 0) {
+        logger << "Theta is not set, using 2% of data size : " << (int)(0.02 * oracle_->size())
+               << " as default." << std::endl;
+        theta_ = (int)(0.02 * oracle_->size());
+    }
+    IdType start = 0;
+    while (start < oracle_->size()) {
+        auto end = std::min(start * 2, start + theta_);
+        end = std::max(end, start + 1);
+        end = std::min(end, oracle_->size());
+        batch_insert(start, end);
+        start = end + 1;
+    }
+}
+
+void
+diskann::ParlayVamana::resize(graph::IdType new_size) {
+    Vamana::resize(new_size);
+    reverse_graph_.resize(new_size);
 }

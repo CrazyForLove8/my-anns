@@ -11,13 +11,24 @@ else ()
     message(FATAL_ERROR "Please install OpenMP")
 endif ()
 
-SET(CMAKE_CXX_FLAGS "-std=c++17 -DNDEBUG -fpic -DHAVE_CXX0X -fopenmp -ftree-vectorize -Ofast -march=native -msse4.2 -mavx2 -mfma")
+SET(CMAKE_CXX_FLAGS "-std=c++17 -DNDEBUG -fpic -DHAVE_CXX0X -fopenmp -ftree-vectorize -march=native -msse4.2 -mavx2 -mfma")
 
-#option(ENABLE_ADDRESS_SANITIZER "Enable AddressSanitizer for memory error detection" ON)
-#if (ENABLE_ADDRESS_SANITIZER)
-#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
-#    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-#endif ()
+set(SANITIZER_TYPE "none")
+
+if (SANITIZER_TYPE STREQUAL "address")
+    message(STATUS "Using AddressSanitizer (-fsanitize=address)")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+
+elseif (SANITIZER_TYPE STREQUAL "thread")
+    message(STATUS "Using ThreadSanitizer (-fsanitize=thread)")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
+
+else ()
+    message(STATUS "No sanitizer: enabling -Ofast optimization")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast")
+endif ()
 
 include_directories(src)
 

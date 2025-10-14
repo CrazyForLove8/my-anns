@@ -18,4 +18,16 @@
 #include "taumng.h"
 #include "vamana.h"
 
+inline IndexParam
+getParam(const DatasetPtr& dataset) {
+    const auto dim = dataset->getBase().dim();
+    const auto metric = dataset->getDistance();
+
+    IndexParam param;
+    param.dim_ = dim;
+    param.metric_ = metric;
+    param.io_type_ = IOType::MEMORY_IO;
+    return param;
+}
+
 #endif  //MYANNS_ANNSLIB_H

@@ -34,6 +34,7 @@ Index::build(DatasetPtr& dataset) {
 
     flatten_graph_ = FlattenGraph(graph_);
     built_ = true;
+    cur_size_ += oracle_->size();
 }
 
 void

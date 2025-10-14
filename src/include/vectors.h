@@ -244,6 +244,7 @@ search_flatten_graph(const Vectors<float>* oracle,
     return retset;
 }
 
+template <bool lock_free = false>
 inline Neighbors
 search_one_graph(const Vectors<float>* oracle,
                  VisitedListPool* visited_list_pool,
@@ -288,23 +289,30 @@ search_one_graph(const Vectors<float>* oracle,
         if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
-            std::lock_guard<std::mutex> guard(graph[n].lock_);
-            for (const auto& candidate : graph[n].candidates_) {
+            auto expand = [&](const auto& candidate) {
                 auto id = candidate.id;
 #ifdef USE_SSE
                 _mm_prefetch(visit_array + id, _MM_HINT_T0);
-//                _mm_prefetch(&oracle[id], _MM_HINT_T0);
 #endif
                 if (visit_array[id] == visit_tag)
-                    continue;
+                    return;
                 visit_array[id] = visit_tag;
-                float dist = (*oracle)(id, query);
-                if (dist >= retset[L - 1].distance)
-                    continue;
-                Neighbor nn(id, dist, true);
+
+                auto dist_local = (*oracle)(id, query);
+                if (dist_local >= retset[L - 1].distance)
+                    return;
+
+                Neighbor nn(id, dist_local, true);
                 int r = insert_into_pool(retset.data(), L, nn);
                 if (r < nk)
                     nk = r;
+            };
+
+            if constexpr (!lock_free) {
+                std::lock_guard<std::mutex> guard(graph[n].lock_);
+                for (const auto& c : graph[n].candidates_) expand(c);
+            } else {
+                for (const auto& c : graph[n].candidates_) expand(c);
             }
         }
         if (nk <= k)
@@ -377,6 +385,7 @@ search_hgraph_layer(const Vectors<float>* oracle,
     return retset;
 }
 
+template <bool lock_free = false>
 inline Neighbors
 search_one_graph_track(const Vectors<float>* oracle,
                        VisitedListPool* visited_list_pool,
@@ -393,6 +402,7 @@ search_one_graph_track(const Vectors<float>* oracle,
         L + 1,
         Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
     Neighbors track;
+
     auto dist = (*oracle)(entry_id, query);
     retset[0] = Neighbor(entry_id, dist, true);
     track.emplace_back(entry_id, dist, true);
@@ -403,31 +413,35 @@ search_one_graph_track(const Vectors<float>* oracle,
         if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
-            std::lock_guard<std::mutex> lock(graph[n].lock_);
-            for (const auto& candidate : graph[n].candidates_) {
+
+            auto expand = [&](const auto& candidate) {
                 auto id = candidate.id;
 #ifdef USE_SSE
                 _mm_prefetch(visit_array + id, _MM_HINT_T0);
-//                _mm_prefetch(&oracle[id], _MM_HINT_T0);
 #endif
                 if (visit_array[id] == visit_tag)
-                    continue;
+                    return;
                 visit_array[id] = visit_tag;
-                dist = (*oracle)(id, query);
-                if (dist >= retset[L - 1].distance)
-                    continue;
-                Neighbor nn(id, dist, true);
+
+                auto dist_local = (*oracle)(id, query);
+                if (dist_local >= retset[L - 1].distance)
+                    return;
+
+                Neighbor nn(id, dist_local, true);
                 int r = insert_into_pool(retset.data(), L, nn);
-                track.emplace_back(id, dist, true);
+                track.emplace_back(id, dist_local, true);
                 if (r < nk)
                     nk = r;
+            };
+
+            if constexpr (!lock_free) {
+                std::lock_guard<std::mutex> guard(graph[n].lock_);
+                for (const auto& c : graph[n].candidates_) expand(c);
+            } else {
+                for (const auto& c : graph[n].candidates_) expand(c);
             }
         }
-        if (nk <= k) {
-            k = nk;
-        } else {
-            ++k;
-        }
+        k = (nk <= k) ? nk : (k + 1);
     }
 
     visited_list_pool->releaseVisitedList(visit_pool_ptr);

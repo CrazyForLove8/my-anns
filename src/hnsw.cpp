@@ -60,25 +60,6 @@ hnsw::HNSW::HNSW(
     }
 }
 
-int
-hnsw::HNSW::seekPos(const Neighbors& vec) {
-    int left = 0, right = vec.size() - 1;
-    if (vec[right].id > 0) {
-        return right;
-    }
-    int result = right;
-    while (left <= right) {
-        int mid = (left + right) / 2;
-        if (vec[mid].id == std::numeric_limits<IdType>::max()) {
-            result = mid;
-            right = mid - 1;
-        } else {
-            left = mid + 1;
-        }
-    }
-    return result;
-}
-
 void
 hnsw::HNSW::addPoint(IdType index) {
     std::lock_guard<std::mutex> guard(graph_[0][index].lock_);
@@ -112,7 +93,7 @@ hnsw::HNSW::addPoint(IdType index) {
                   res.end());
         res.erase(std::unique(res.begin(), res.end()), res.end());
 
-        int cur_max_cnt = level ? max_neighbors_ : max_base_neighbors_;
+        auto cur_max_cnt = i ? max_neighbors_ : max_base_neighbors_;
         prune(res, cur_max_cnt);
 
         auto& graph = graph_[i];
@@ -132,100 +113,8 @@ hnsw::HNSW::addPoint(IdType index) {
     }
 }
 
-struct CompareByCloser {
-    bool
-    operator()(const Node& a, const Node& b) {
-        return a.distance > b.distance;
-    }
-};
-
-Neighbors
-hnsw::HNSW::searchLayer(
-    const Graph& graph, const float* query, size_t topk, size_t L, size_t entry_id) const {
-    auto graph_sz = graph.size();
-    std::vector<bool> visited(graph_sz, false);
-    Neighbors retset(
-        L + 1,
-        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
-    auto dist = (*oracle_)(entry_id, query);
-    retset[0] = Neighbor(entry_id, dist, true);
-    int k = 0;
-    while (k < L) {
-        int nk = L;
-        if (retset[k].flag) {
-            retset[k].flag = false;
-            auto n = retset[k].id;
-            for (const auto& candidate : graph[n].candidates_) {
-                auto id = candidate.id;
-                if (visited[id])
-                    continue;
-                visited[id] = true;
-                dist = (*oracle_)(id, query);
-                if (dist >= retset[L - 1].distance)
-                    continue;
-                Neighbor nn(id, dist, true);
-                int r = insert_into_pool(retset.data(), L, nn);
-                if (r < nk)
-                    nk = r;
-            }
-        }
-        if (nk <= k)
-            k = nk;
-        else
-            ++k;
-    }
-    retset.resize(topk);
-    return retset;
-}
-
-Neighbors
-hnsw::HNSW::searchLayer(
-    Graph& graph, IndexOracle<float>& oracle, float* query, int enter_point, int ef) {
-    visited_table_.clear();
-    visited_table_.insert(enter_point);
-    std::priority_queue<Node, std::vector<Node>, CompareByCloser> candidates;
-    std::priority_queue<Node> result;
-    auto dist = oracle(enter_point, query);
-    candidates.emplace(enter_point, dist);
-    result.emplace(enter_point, dist);
-
-    auto farthest = result.top().distance;
-
-    while (!candidates.empty()) {
-        auto c = candidates.top();
-        if (c.distance > farthest && result.size() == ef) {
-            break;
-        }
-        candidates.pop();
-        for (auto& n : graph[c.id].candidates_) {
-            if (visited_table_.find(n.id) == visited_table_.end()) {
-                visited_table_.insert(n.id);
-                auto d = oracle(n.id, query);
-                if (result.size() < ef || d < farthest) {
-                    candidates.emplace(n.id, d);
-                    result.emplace(n.id, d);
-                    if (result.size() > ef) {
-                        result.pop();
-                    }
-                    if (!result.empty()) {
-                        farthest = result.top().distance;
-                    }
-                }
-            }
-        }
-    }
-    Neighbors ret;
-    while (!result.empty()) {
-        auto r = result.top();
-        ret.emplace_back(r.id, r.distance, false);
-        result.pop();
-    }
-    std::reverse(ret.begin(), ret.end());
-    return ret;
-}
-
 void
-hnsw::HNSW::prune(Neighbors& candidates, int max_neighbors) {
+hnsw::HNSW::prune(Neighbors& candidates, IdType max_neighbors) {
     if (candidates.size() <= max_neighbors) {
         return;
     }
@@ -324,11 +213,11 @@ hnsw::HNSW::partial_build(IdType start, IdType end) {
     timer.end();
     logger << "Adding time: " << timer.elapsed() << "s" << std::endl;
 }
+
 void
 hnsw::HNSW::resize(const IdType new_size) {
     visited_list_pool_ = VisitedListPool::getInstance(new_size);
 
-    levels_.reserve(oracle_->size());
     levels_.resize(oracle_->size(), 0);
 
     auto total = oracle_->size();
@@ -338,9 +227,11 @@ hnsw::HNSW::resize(const IdType new_size) {
         max_level_ = std::max(max_level_, levels_[i]);
     }
 
-    graph_.reserve(max_level_ + 1);
-    for (auto i = graph_.size(); i <= max_level_; ++i) {
-        graph_.emplace_back(total);
+    if (graph_.size() <= max_level_) {
+        graph_.resize(max_level_ + 1);
+    }
+    for (auto& g : graph_) {
+        g.resize(total);
     }
 }
 
@@ -398,6 +289,7 @@ hnsw::HNSW::build(DatasetPtr& dataset) {
 
     flatten_graph_ = FlattenHGraph(graph_);
     built_ = true;
+    cur_size_ += oracle_->size();
     logger << "HNSW Index built successfully." << std::endl;
 }
 
@@ -412,12 +304,13 @@ hnsw::HNSW::add(DatasetPtr& dataset) {
     timer.start();
 
     auto cur_size = cur_size_;
-    auto total = dataset->getOracle()->size() + cur_size;
     oracle_->insert(dataset->getBasePtr());
+    auto total = oracle_->size();
+    this->resize(total);
 
 #pragma omp parallel for schedule(dynamic)
-    for (int i = cur_size; i < total; ++i) {
-        if (i % 100000 == 0) {
+    for (auto i = cur_size; i < total; ++i) {
+        if (i % (oracle_->size() / 10) == 0) {
             logger << "Adding " << i << " / " << total << std::endl;
         }
         addPoint(i);
@@ -440,11 +333,6 @@ hnsw::HNSW::set_max_neighbors(int max_neighbors) {
 void
 hnsw::HNSW::set_ef_construction(int ef_construction) {
     this->ef_construction_ = ef_construction;
-}
-
-void
-hnsw::HNSW::set_cur_size(IdType cur_size) {
-    cur_size_ = cur_size;
 }
 
 ParamMap
@@ -481,4 +369,105 @@ hnsw::HNSW::load_params(const ParamMap& params) {
 
 void
 hnsw::HNSW::remove(IdType id) {
+}
+
+hnsw::ParlayHNSW::ParlayHNSW(const IndexParam& param, int M, int ef_construction, int theta)
+    : HNSW(param, M, ef_construction), theta_(theta) {
+}
+
+void
+hnsw::ParlayHNSW::batch_insert(IdType start, IdType end) {
+#pragma omp parallel for schedule(dynamic)
+    for (auto i = start; i < end; ++i) {
+        int level = levels_[i];
+        std::unique_lock<std::mutex> graph_lock(graph_lock_);
+        int max_level_copy = cur_max_level_;
+        if (level <= max_level_copy) {
+            graph_lock.unlock();
+        }
+
+        uint32_t cur_node_ = enter_point_;
+        for (auto l = max_level_copy; l > level; --l) {
+            auto res = search_one_graph<true>(
+                oracle_.get(), visited_list_pool_.get(), graph_[l], (*oracle_)[i], 1, 1, cur_node_);
+            cur_node_ = res[0].id;
+        }
+
+        for (auto l = std::min(level, max_level_copy); l >= 0; --l) {
+            auto res = search_one_graph<true>(oracle_.get(),
+                                              visited_list_pool_.get(),
+                                              graph_[l],
+                                              (*oracle_)[i],
+                                              ef_construction_,
+                                              ef_construction_,
+                                              cur_node_);
+
+            auto cur_max_cnt = l ? max_neighbors_ : max_base_neighbors_;
+            prune(res, cur_max_cnt);
+
+            graph_[l][i].candidates_.swap(res);
+            cur_node_ = graph_[l][i].candidates_[0].id;
+        }
+
+        if (level > max_level_copy) {
+            enter_point_ = i;
+            cur_max_level_ = level;
+        }
+    }
+
+    for (int l = 0; l <= cur_max_level_; ++l) {
+#pragma omp parallel for schedule(dynamic)
+        for (auto u = start; u < end; ++u) {
+            if (graph_[l][u].candidates_.empty()) {
+                continue;
+            }
+            for (auto& v : graph_[l][u].candidates_) {
+                std::lock_guard<std::mutex> guard(reverse_graph_[v.id].lock_);
+                reverse_graph_[v.id].candidates_.emplace_back(u, v.distance, false);
+            }
+        }
+#pragma omp parallel for schedule(dynamic)
+        for (int u = 0; u < reverse_graph_.size(); ++u) {
+            if (reverse_graph_[u].candidates_.empty()) {
+                continue;
+            }
+            graph_[l][u].candidates_.insert(graph_[l][u].candidates_.end(),
+                                            reverse_graph_[u].candidates_.begin(),
+                                            reverse_graph_[u].candidates_.end());
+            reverse_graph_[u].candidates_.clear();
+            std::sort(graph_[l][u].candidates_.begin(), graph_[l][u].candidates_.end());
+            auto max_cnt = l ? max_neighbors_ : max_base_neighbors_;
+            prune(graph_[l][u].candidates_, max_cnt);
+        }
+    }
+}
+
+void
+hnsw::ParlayHNSW::print_info() const {
+    HNSW::print_info();
+    logger << "ParlayHNSW parameters:" << std::endl;
+}
+
+void
+hnsw::ParlayHNSW::build_internal(DatasetPtr& dataset) {
+    if (theta_ <= 0) {
+        logger << "Theta is not set, using 2% of data size : " << (int)(0.02 * oracle_->size())
+               << " as default." << std::endl;
+        theta_ = (int)(0.02 * oracle_->size());
+    }
+    IdType start = 0;
+    while (start < oracle_->size()) {
+        auto end = std::min(start * 2, start + theta_);
+        end = std::max(end, start + 1);
+        end = std::min(end, oracle_->size());
+        logger << "Inserting from " << start << " to " << end << std::endl;
+        batch_insert(start, end);
+        start = end + 1;
+    }
+}
+
+void
+hnsw::ParlayHNSW::resize(graph::IdType new_size) {
+    HNSW::resize(new_size);
+    reverse_graph_.resize(new_size);
 }
