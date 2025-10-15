@@ -36,6 +36,6 @@ int
 main() {
     Log::setVerbose(true);
 
-    testBuild();
+    testParlayBuild();
     return 0;
 }

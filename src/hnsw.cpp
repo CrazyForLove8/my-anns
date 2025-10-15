@@ -380,11 +380,7 @@ hnsw::ParlayHNSW::batch_insert(IdType start, IdType end) {
 #pragma omp parallel for schedule(dynamic)
     for (auto i = start; i < end; ++i) {
         int level = levels_[i];
-        std::unique_lock<std::mutex> graph_lock(graph_lock_);
         int max_level_copy = cur_max_level_;
-        if (level <= max_level_copy) {
-            graph_lock.unlock();
-        }
 
         uint32_t cur_node_ = enter_point_;
         for (auto l = max_level_copy; l > level; --l) {
