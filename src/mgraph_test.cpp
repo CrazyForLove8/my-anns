@@ -75,11 +75,27 @@ test_multi_thread() {
     recall(merge, dataset, 200);
 }
 
+void
+test_merge(){
+    auto dataset = Dataset::getInstance("msong", "10k");
+    auto subsets = dataset->subsets(2);
+    std::vector<IndexPtr> indexes;
+    for (auto& subset : subsets) {
+        auto idx = std::make_shared<hnsw::HNSW>(subset, 16, 200);
+        idx->build();
+        indexes.emplace_back(idx);
+    }
+
+    auto merge = std::make_shared<MGraph>(dataset, 16, 200);
+    merge->combine(indexes);
+    recall(merge, dataset, 200);
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    test_multi_thread();
+    test_merge();
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
     if (ret != 0) {
         std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
