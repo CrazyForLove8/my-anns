@@ -55,6 +55,7 @@ graph::MemoryIO::write(const DataPtr& src, const uint64_t stride, const uint64_t
         std::unique_lock lock(rw_mutex_);
         if (data_ == nullptr || new_size > size_) {
             uint8_t* new_data = nullptr;
+            // TODO Alignment 32 or 64?
             if (posix_memalign(reinterpret_cast<void**>(&new_data), alignment_, new_size) != 0) {
                 throw std::bad_alloc();
             }

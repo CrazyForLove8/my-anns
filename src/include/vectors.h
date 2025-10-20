@@ -45,8 +45,10 @@ public:
         switch (io_type) {
             case IOType::MEMORY_IO:
                 io_ = std::make_shared<MemoryIO>(dim * sizeof(T));
+                logger << "Using Memory IO for Vectors." << std::endl;
                 break;
             case IOType::FILE_IO:
+                logger << "File IO is not yet supported for Vectors." << std::endl;
                 // TODO support file io
                 break;
             default:
@@ -56,9 +58,11 @@ public:
         switch (dist_type) {
             case metric::DISTANCE::L2:
                 dist_func_ = metric::l2_dist;
+                logger << "Using L2 distance for Vectors." << std::endl;
                 break;
             case metric::DISTANCE::COSINE:
                 dist_func_ = metric::angular_dist;
+                logger << "Using Cosine distance for Vectors." << std::endl;
                 break;
             default:
                 throw std::invalid_argument("Unsupported distance type");
@@ -96,6 +100,7 @@ public:
             throw std::invalid_argument("Invalid data in batchInsertVectors");
         }
         if (ids == nullptr) {
+            logger << "Ids not provided, inserting vectors with continuous ids." << std::endl;
             auto cnt = 0;
             {
                 std::lock_guard lock(rw_mutex_);
