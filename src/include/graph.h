@@ -78,7 +78,7 @@ struct Neighbor {
 using Neighbors = std::vector<Neighbor>;
 
 struct Neighborhood {
-    std::mutex lock_;
+    std::mutex lock_;   //TODO: remove lock with low-cost and conflict-manageable SpinLock Manager
     Neighbors candidates_;
     std::vector<int> old_;
     std::vector<int> new_;

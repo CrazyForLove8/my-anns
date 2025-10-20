@@ -10,6 +10,7 @@
 #include <random>
 #include <unordered_set>
 
+#include "bitset.h"
 #include "index.h"
 
 namespace hnsw {
@@ -122,6 +123,22 @@ public:
 
     void
     print_info() const override;
+};
+
+class LuceneHNSW : public HNSW {
+
+    uint32_t ef_c_new_{};
+
+    std::vector<IdType>
+    compute_join_set(HGraph& graph);
+
+    void print_info() const override;
+
+public:
+    LuceneHNSW(const IndexParam& param, int max_neighbors, int ef_construction, int ef_c_new = -1);
+
+    void
+    combine(std::shared_ptr<HNSW>& other_index);
 };
 
 }  // namespace hnsw

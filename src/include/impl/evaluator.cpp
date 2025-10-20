@@ -78,7 +78,7 @@ calRecall(const IndexPtr& index,
 void
 graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
               DatasetPtr& dataset,
-              std::variant<int, std::vector<int> > search_L,
+              std::variant<int, std::vector<int>, std::initializer_list<int>> search_L,
               unsigned K,
               unsigned runs) {
     std::vector<int> search_Ls;
@@ -88,6 +88,10 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
         search_Ls = {};
     } else if (std::holds_alternative<int>(search_L)) {
         search_Ls = {std::get<int>(search_L)};
+    } else if (std::holds_alternative<std::initializer_list<int> >(search_L)) {
+        for (auto L : std::get<std::initializer_list<int> >(search_L)) {
+            search_Ls.push_back(L);
+        }
     }
     if (search_Ls.empty()) {
         if (K == 100) {

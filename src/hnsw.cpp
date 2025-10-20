@@ -467,3 +467,198 @@ hnsw::ParlayHNSW::resize(graph::IdType new_size) {
     HNSW::resize(new_size);
     reverse_graph_.resize(new_size);
 }
+
+std::vector<IdType>
+hnsw::LuceneHNSW::compute_join_set(HGraph &graph) {
+    auto &base_graph = graph[0];
+    std::vector<IdType> ret_set;
+
+    struct Candidate {
+        bool stale_{false};
+        int gain_{0};
+        IdType adj_cnt_{0};
+        float random_{};
+    };
+    std::vector<Candidate> candidates(base_graph.size());
+    std::priority_queue<std::pair<int, IdType>> pq;
+
+    std::uniform_real_distribution<float> distribution(0.0, 1.0);
+
+    int gain_exit = 0, gain_tot = 0;
+    for (IdType i = 0; i < base_graph.size(); ++i) {
+        auto k_i = std::max(2, (int) (base_graph[i].candidates_.size() / 4));
+        candidates[i] = {
+                .gain_ = k_i + (int) base_graph[i].candidates_.size(),
+                .random_ = distribution(random_engine_),
+        };
+        pq.emplace(candidates[i].gain_, i);
+
+        gain_exit += k_i;
+    }
+
+    auto iter = 0;
+    while (gain_tot < gain_exit) {
+        ++iter;
+        if (iter % 10000 == 0) {
+            logger << "Join set selection iteration " << iter
+                   << ", current gain: " << gain_tot << " / " << gain_exit << std::endl;
+        }
+        auto v_star_id = pq.top().second;
+        pq.pop();
+        auto &v_star = candidates[v_star_id];
+
+        auto k_v_star = std::max(2, (int) (base_graph[v_star_id].candidates_.size() / 4));
+        if (!v_star.stale_) {
+            ret_set.emplace_back(v_star_id);
+            gain_tot += v_star.gain_;
+            for (auto &u: base_graph[v_star_id].candidates_) {
+                if (candidates[v_star_id].adj_cnt_ < k_v_star) {
+                    candidates[u.id].stale_ = true;
+                }
+                if (candidates[v_star_id].adj_cnt_ == k_v_star - 1) {
+                    for (auto &w: base_graph[u.id].candidates_) {
+                        candidates[w.id].stale_ = true;
+                    }
+                }
+                ++candidates[u.id].adj_cnt_;
+            }
+        } else {
+            auto gain_v_star = std::max(k_v_star - (int) candidates[v_star_id].adj_cnt_, 0);
+            for (auto &u: base_graph[v_star_id].candidates_) {
+                if (candidates[v_star_id].adj_cnt_ < k_v_star) {
+                    ++gain_v_star;
+                }
+            }
+            if (gain_v_star > 0) {
+                candidates[v_star_id].gain_ = gain_v_star;
+                candidates[v_star_id].stale_ = false;
+                pq.emplace(candidates[v_star_id].gain_, v_star_id);
+            }
+        }
+    }
+
+    std::sort(ret_set.begin(), ret_set.end());
+    return std::move(ret_set);
+}
+
+void
+hnsw::LuceneHNSW::combine(std::shared_ptr<HNSW> &other_index) {
+    Timer timer;
+    timer.start();
+
+    auto &other_graph = other_index->extract_hgraph();
+    Timer timer1;
+    timer1.start();
+    auto j = compute_join_set(other_graph);
+    timer1.end();
+    logger << "Join set size: " << j.size() << std::endl;
+    logger << "Join set computation time: " << timer1.elapsed() << "s" << std::endl;
+
+    oracle_->insert(other_index->extract_vectors());
+    this->resize(oracle_->size());
+
+    timer1.start();
+    Bitset bitset(oracle_->size());
+
+#pragma omp parallel for schedule(dynamic, 256)
+    for (auto id: j) {
+        auto new_id = cur_size_ + id;
+        this->addPoint(new_id);
+
+        bitset.set(new_id);
+    }
+    timer1.end();
+    logger << "Join set insertion time: " << timer1.elapsed() << "s" << std::endl;
+
+#pragma omp parallel for schedule(dynamic, 256)
+    for (IdType i = cur_size_; i < oracle_->size(); ++i) {
+        if (i % (oracle_->size() / 10) == 0) {
+            logger << "Combining " << i << " / " << oracle_->size() << std::endl;
+        }
+        if (bitset.test(i)) {
+            continue;
+        }
+        int level = levels_[i];
+        std::unique_lock<std::mutex> graph_lock(graph_lock_);
+        int max_level_copy = cur_max_level_;
+        if (level <= max_level_copy) {
+            graph_lock.unlock();
+        }
+
+        for (int l = levels_[i]; l >= 0; --l){
+            std::vector<IdType> candidate;
+            auto original_id = i - cur_size_;
+            for (auto &neighbor: other_graph[0][original_id].candidates_) {
+                if (bitset.test(cur_size_ + neighbor.id) && levels_[cur_size_ + neighbor.id] >= l) {
+                    candidate.emplace_back(cur_size_ + neighbor.id);
+                }
+            }
+
+            std::vector<IdType> candidate_neighbors;
+            for (auto &u: candidate) {
+                candidate_neighbors.emplace_back(u);
+                for (auto &neighbor: graph_[0][u].candidates_) {
+                    candidate_neighbors.emplace_back(neighbor.id);
+                }
+            }
+            std::sort(candidate_neighbors.begin(), candidate_neighbors.end());
+            candidate_neighbors.erase(std::unique(candidate_neighbors.begin(),
+                                                  candidate_neighbors.end(),
+                                                  [](IdType a, IdType b) { return a == b; }),
+                                      candidate_neighbors.end());
+            candidate_neighbors.resize(ef_construction_,
+                                       std::numeric_limits<IdType>::max());
+            if (candidate_neighbors[0] == std::numeric_limits<IdType>::max()) {
+                candidate_neighbors[0] = enter_point_;
+            }
+
+            auto res = search_hgraph_layer_with_seed(oracle_.get(),
+                                                    visited_list_pool_.get(),
+                                                    graph_,
+                                                    l,
+                                                    (*oracle_)[i],
+                                                    ef_c_new_,
+                                                    ef_c_new_,
+                                                    candidate_neighbors);
+
+            auto cur_max_cnt = l ? max_neighbors_ : max_base_neighbors_;
+            prune(res, cur_max_cnt);
+            graph_[l][i].candidates_.swap(res);
+
+            for (auto &e: graph_[l][i].candidates_) {
+                std::lock_guard<std::mutex> lock(graph_[0][e.id].lock_);
+                graph_[l][e.id].addNeighbor(Neighbor(i, e.distance, false));
+                prune(graph_[l][e.id].candidates_, cur_max_cnt);
+            }
+        }
+
+        if (level > max_level_copy) {
+            enter_point_ = i;
+            cur_max_level_ = level;
+        }
+        bitset.set(i);
+    }
+
+    timer.end();
+    logger << "Combining time: " << timer.elapsed() << "s" << std::endl;
+
+    cur_size_ += other_graph[0].size();
+    flatten_graph_ = FlattenHGraph(graph_);
+    built_ = true;
+}
+
+hnsw::LuceneHNSW::LuceneHNSW(const IndexParam &param,
+                             int max_neighbors,
+                             int ef_construction,
+                             int ef_c_new) : HNSW(param, max_neighbors, ef_construction), ef_c_new_(ef_c_new) {
+    if (ef_c_new <= 0) {
+        logger << "ef_c_new is not set, using ef_construction : " << ef_construction
+               << " as default." << std::endl;
+        ef_c_new_ = ef_construction;
+    }
+}
+
+void hnsw::LuceneHNSW::print_info() const {
+    HNSW::print_info();
+    logger << "EF_C_NEW: " << ef_c_new_ << std::endl;
+}
