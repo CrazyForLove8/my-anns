@@ -6,10 +6,10 @@ using namespace hnsw;
 
 void
 testBuild() {
-    auto dataset = Dataset::getInstance("sift", "1m");
-    auto index = std::make_shared<HNSW>(getParam(dataset), 32, 200);
+    auto dataset = Dataset::getInstance("msong", "1m");
+    auto index = std::make_shared<HNSW>(getParam(dataset), 16, 200);
     index->build(dataset);
-    recall(index, dataset);
+    recall(index, dataset, 200);
 }
 
 void
@@ -55,7 +55,7 @@ int
 main() {
     Log::setVerbose(true);
 
-    testESBlog();
+    testBuild();
 
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
     if (ret != 0) {

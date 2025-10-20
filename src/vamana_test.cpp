@@ -4,7 +4,7 @@
 
 void
 testBuild() {
-    auto dataset = Dataset::getInstance("sift", "100k");
+    auto dataset = Dataset::getInstance("msong", "100k");
     auto index = std::make_shared<diskann::Vamana>(getParam(dataset), 1.2, 200, 32);
     index->build(dataset);
     recall(index, dataset);
@@ -36,7 +36,7 @@ int
 main() {
     Log::setVerbose(true);
 
-    testParlayBuild();
+    testBuild();
 
     return 0;
 }

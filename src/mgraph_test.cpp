@@ -2,7 +2,7 @@
 
 void
 testMerge() {
-    auto dataset = Dataset::getInstance("crawl", "1m");
+    auto dataset = Dataset::getInstance("glove", "10k");
     Log::redirect("mgraph_" + dataset->getName());
     auto datasets = dataset->subsets(2);
 
