@@ -33,15 +33,32 @@ testParlayBuild() {
 }
 
 void
+test_multi_thread_parlay() {
+    auto name = "gist";
+    std::vector<IndexPtr> indexes;
+    auto dataset = Dataset::getInstance(name, "1m");
+    Log::redirect("multi_parlay_" + dataset->getName());
+    logger << std::endl;
+
+    auto nums = {1};
+    for (auto num : nums) {
+        omp_set_num_threads(num);
+        auto index = std::make_shared<ParlayHNSW>(getParam(dataset),32, 200);
+        index->build(dataset);
+        recall(index, dataset, 200);
+    }
+}
+
+void
 testESBlog(){
     auto dataset = Dataset::getInstance("sift", "1m");
-//    Log::redirect("esblog_" + dataset->getName());
+    Log::redirect("esblog_" + dataset->getName());
     auto datasets = dataset->subsets(2);
 
-    auto index1 = std::make_shared<LuceneHNSW>(getParam(dataset), 16, 200, 100);
+    auto index1 = std::make_shared<LuceneHNSW>(getParam(dataset), 32, 200, 100);
     index1->build(datasets[0]);
 
-    auto index2 = std::make_shared<HNSW>(getParam(dataset), 16, 200);
+    auto index2 = std::make_shared<HNSW>(getParam(dataset), 32, 200);
     index2->build(datasets[1]);
 
     omp_set_num_threads(1);
@@ -55,7 +72,7 @@ int
 main() {
     Log::setVerbose(true);
 
-    testBuild();
+    test_multi_thread_parlay();
 
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
     if (ret != 0) {

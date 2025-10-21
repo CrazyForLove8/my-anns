@@ -101,8 +101,6 @@ nsw::NSW::build_internal(DatasetPtr& dataset) {
         }
         addPoint(i);
     }
-
-    flatten_graph_ = FlattenGraph(graph_);
 }
 
 void

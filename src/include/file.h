@@ -139,10 +139,10 @@ public:
 class FileIO : public IO {
 public:
     DataPtr
-    read(uint64_t size, uint64_t offset) override;
+    read(uint64_t size, IdType offset) override;
 
     void
-    write(const DataPtr& data, uint64_t size, uint64_t offset) override;
+    write(const DataPtr& data, uint64_t size, IdType offset) override;
 
     ~FileIO() override = default;
 };

@@ -67,10 +67,17 @@ diskann::Vamana::partial_build(graph::IdType start, graph::IdType end) {
     std::iota(permutation.begin(), permutation.end(), start);
     std::shuffle(permutation.begin(), permutation.end(), std::mt19937(std::random_device()()));
 
+    Timer timer;
+    bool flag = false;
+
 #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < permutation.size(); ++i) {
         if (i % (permutation.size() / 10) == 0) {
             logger << "Processing " << i << " / " << graph_.size() << std::endl;
+            if (i >= permutation.size() / 2 && !flag) {
+                flag = true;
+                timer.start();
+            }
         }
         auto res = search_one_graph_track(
             oracle_.get(), visited_list_pool_.get(), graph_, (*oracle_)[permutation[i]], L_, root);
@@ -92,6 +99,9 @@ diskann::Vamana::partial_build(graph::IdType start, graph::IdType end) {
             }
         }
     }
+
+    timer.end();
+    logger << "Vamana half build time: " << timer.elapsed() << "s" << std::endl;
 }
 
 void
@@ -148,6 +158,7 @@ diskann::Vamana::extract_params() {
     params["R"] = (uint64_t)R_;
     return params;
 }
+
 void
 diskann::Vamana::add(DatasetPtr& dataset) {
     //TODO
@@ -285,13 +296,22 @@ diskann::ParlayVamana::build_internal(DatasetPtr& dataset) {
         theta_ = (int)(0.02 * oracle_->size());
     }
     IdType start = 0;
+    bool flag = false;
+    Timer timer;
     while (start < oracle_->size()) {
         auto end = std::min(start * 2, start + theta_);
         end = std::max(end, start + 1);
         end = std::min(end, oracle_->size());
+        logger << "Inserting from " << start << " to " << end << std::endl;
+        if (start > oracle_->size() / 2 && !flag) {
+            flag = true;
+            timer.start();
+        }
         batch_insert(start, end);
         start = end + 1;
     }
+    timer.end();
+    logger << "ParlayVamana half-inserting time: " << timer.elapsed() << "s" << std::endl;
 }
 
 void

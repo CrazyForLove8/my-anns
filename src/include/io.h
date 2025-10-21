@@ -18,11 +18,17 @@ protected:
     uint64_t size_{0};
 
 public:
+    /**
+     *
+     * @param stride Number of bytes to be read
+     * @param offset Read at the given inner id
+     * @return
+     */
     virtual DataPtr
-    read(uint64_t stride, uint64_t offset) = 0;
+    read(uint64_t stride, IdType offset) = 0;
 
     virtual void
-    write(const DataPtr& data, uint64_t stride, uint64_t offset) = 0;
+    write(const DataPtr& data, uint64_t stride, IdType offset) = 0;
 
     virtual ~IO();
 };

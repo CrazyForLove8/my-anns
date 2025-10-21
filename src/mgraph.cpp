@@ -285,7 +285,7 @@ MGraph::ReconstructHGraph() {
 
 void
 MGraph::combine(std::vector<IndexPtr>& indexes) {
-    IdType total_size = 0;
+    IdType total_size = cur_size_;
     for (const auto& index : indexes) {
         const auto vec_ptr = index->extract_vectors();
         oracle_->insert(vec_ptr, total_size);

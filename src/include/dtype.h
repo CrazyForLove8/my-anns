@@ -227,6 +227,11 @@ public:
         return data.get() == m.data.get();
     }
 
+    T*
+    get_data(const unsigned i) {
+        return reinterpret_cast<T*>(data.get() + stride_ * i + offset_bytes_);
+    }
+
     std::shared_ptr<T>
     operator[](unsigned i) {
         if (use_disk_) {

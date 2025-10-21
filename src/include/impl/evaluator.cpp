@@ -22,8 +22,8 @@ calRecall(
 #pragma omp parallel for reduction(+ : local_recall)
 #endif
         for (size_t i = 0; i < qsize; ++i) {
-            auto result = index.search(query[i].get(), K, L);
-            std::unordered_set<unsigned> gt(groundTruth[i].get(), groundTruth[i].get() + K);
+            auto result = index.search(query.get_data(i), K, L);
+            std::unordered_set<unsigned> gt(groundTruth.get_data(i), groundTruth.get_data(i) + K);
             size_t correct = 0;
             for (const auto& res : result) {
                 if (gt.find(res.id) != gt.end()) {
@@ -58,8 +58,8 @@ calRecall(const IndexPtr& index,
 #pragma omp parallel for reduction(+ : local_recall)
 #endif
         for (size_t i = 0; i < qsize; ++i) {
-            auto result = index->search(query[i].get(), K, L);
-            std::unordered_set<unsigned> gt(groundTruth[i].get(), groundTruth[i].get() + K);
+            auto result = index->search(query.get_data(i), K, L);
+            std::unordered_set<unsigned> gt(groundTruth.get_data(i), groundTruth.get_data(i) + K);
             size_t correct = 0;
             for (const auto& res : result) {
                 if (gt.find(res.id) != gt.end()) {
@@ -87,7 +87,9 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
     } else if (std::holds_alternative<int>(search_L) && std::get<int>(search_L) < 0) {
         search_Ls = {};
     } else if (std::holds_alternative<int>(search_L)) {
-        search_Ls = {std::get<int>(search_L)};
+        if (std::get<int>(search_L) > 0) {
+            search_Ls = {std::get<int>(search_L)};
+        }
     } else if (std::holds_alternative<std::initializer_list<int> >(search_L)) {
         for (auto L : std::get<std::initializer_list<int> >(search_L)) {
             search_Ls.push_back(L);
@@ -96,7 +98,7 @@ graph::recall(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
     if (search_Ls.empty()) {
         if (K == 100) {
             search_Ls = {
-                100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600};
+                100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400};
         } else {
             for (int i = 20; i < 100; i += 20) {
                 search_Ls.push_back(i);
@@ -333,7 +335,7 @@ graph::dist(std::variant<std::reference_wrapper<Index>, IndexPtr> index,
     std::vector<unsigned> search_Ls;
     if (search_L == -1) {
         search_Ls = {
-            20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000};
+            20, 40, 60, 80, 100, 200, 300, 400, 500, 600, 700, 800, 900};
     } else {
         search_Ls = {search_L};
     }

@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "io.h"
+#include "logger.h"
 
 namespace graph {
 
@@ -28,14 +29,15 @@ class MemoryIO final : public IO {
 
 public:
     explicit MemoryIO(const size_t stride) {
+        logger << "Using MemoryIO with stride " << stride << " bytes." << std::endl;
         stride_ = (stride + ALIGNMENT - 1) / ALIGNMENT * ALIGNMENT;
     }
 
     DataPtr
-    read(uint64_t stride, uint64_t offset) override;
+    read(uint64_t stride, IdType offset) override;
 
     void
-    write(const DataPtr& src, uint64_t stride, uint64_t offset) override;
+    write(const DataPtr& src, uint64_t stride, IdType offset) override;
 
     ~MemoryIO() override;
 };

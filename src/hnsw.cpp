@@ -452,14 +452,22 @@ hnsw::ParlayHNSW::build_internal(DatasetPtr& dataset) {
         theta_ = (int)(0.02 * oracle_->size());
     }
     IdType start = 0;
+    bool flag = false;
+    Timer timer;
     while (start < oracle_->size()) {
         auto end = std::min(start * 2, start + theta_);
         end = std::max(end, start + 1);
         end = std::min(end, oracle_->size());
         logger << "Inserting from " << start << " to " << end << std::endl;
+        if (start > oracle_->size() / 2 && !flag) {
+            flag = true;
+            timer.start();
+        }
         batch_insert(start, end);
         start = end + 1;
     }
+    timer.end();
+    logger << "ParlayHNSW half-inserting time: " << timer.elapsed() << "s" << std::endl;
 }
 
 void

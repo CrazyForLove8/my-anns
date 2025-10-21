@@ -151,9 +151,40 @@ testSSD() {
     }
 }
 
+void
+testVectors() {
+    auto dataset = Dataset::getInstance("msong", "10k");
+
+    auto base = dataset->getBasePtr();
+    std::cout << "Base matrix size: " << base->size() << std::endl;
+    // print first 5 vectors
+    for (int i = 0; i < 5; ++i) {
+        for (int j = 0; j < 420; ++j) {
+            std::cout << (*base)(i, j) << " ";
+        }
+        std::cout << std::endl << std::endl;
+    }
+    std::cout << std::endl;
+
+    auto index = std::make_shared<hnsw::HNSW>(getParam(dataset), 16, 200);
+    index->build(dataset);
+
+    auto vec = index->extract_vectors();
+    std::cout << "Extracted vectors size: " << vec->size() << std::endl;
+    for (int i = 0; i < 5; ++i) {
+        for (int j = 0; j < 420; ++j) {
+            std::cout << (*vec)[i][j] << " ";
+        }
+        std::cout << std::endl << std::endl;
+    }
+
+    recall(index, dataset);
+
+}
+
 int
 main() {
     Log::setVerbose(true);
 
-    testSSD();
+    testVectors();
 }

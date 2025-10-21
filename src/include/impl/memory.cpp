@@ -39,40 +39,35 @@ graph::print_memory_usage() {
 }
 
 graph::DataPtr
-graph::MemoryIO::read(const uint64_t stride, const uint64_t offset) {
+graph::MemoryIO::read(const uint64_t stride, const IdType offset) {
     // std::shared_lock lock(rw_mutex_);
-    if (data_ == nullptr || stride + offset > size_) {
+    if (data_ == nullptr || stride + offset * stride_ > size_) {
         throw std::runtime_error("Read out of bounds in MemoryIO");
     }
-    return data_ + offset;
+    return data_ + offset * stride_;
 }
 
 void
-graph::MemoryIO::write(const DataPtr& src, const uint64_t stride, const uint64_t offset) {
-    const uint64_t new_size = stride + offset;
+graph::MemoryIO::write(const DataPtr& src, const uint64_t stride, const IdType offset) {
+    const uint64_t new_size = stride + offset * stride_;
 
-    {
-        std::unique_lock lock(rw_mutex_);
-        if (data_ == nullptr || new_size > size_) {
-            uint8_t* new_data = nullptr;
-            // TODO Alignment 32 or 64?
-            if (posix_memalign(reinterpret_cast<void**>(&new_data), alignment_, new_size) != 0) {
-                throw std::bad_alloc();
-            }
-
-            if (data_ != nullptr) {
-                std::memcpy(new_data, data_, size_);
-                free(data_);
-            }
-
-            data_ = new_data;
-            size_ = new_size;
+    std::unique_lock lock(rw_mutex_);
+    if (data_ == nullptr || new_size > size_) {
+        uint64_t new_block_size = std::max(size_ * 2, new_size);
+        // logger << "Reallocating MemoryIO from size " << size_ << " to " << new_block_size << std::endl;
+        uint8_t* new_data = nullptr;
+        if (posix_memalign(reinterpret_cast<void**>(&new_data), ALIGNMENT, new_block_size) != 0) {
+            throw std::bad_alloc();
         }
+
+        if (data_ != nullptr) {
+            std::memcpy(new_data, data_, size_);
+            free(data_);
+        }
+        data_ = new_data;
+        size_ = new_block_size;
     }
-    {
-        std::unique_lock lock(rw_mutex_);
-        std::memcpy(data_ + offset, src, stride);
-    }
+    std::memcpy(data_ + offset * stride_, src, stride);
 }
 
 graph::MemoryIO::~MemoryIO() {

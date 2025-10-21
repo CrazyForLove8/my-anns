@@ -42,6 +42,7 @@ public:
                      const metric::DISTANCE dist_type,
                      const IOType io_type = IOType::MEMORY_IO)
         : dim_(dim) {
+        logger << "Creating Vectors with dimension: " << dim_ << std::endl;
         switch (io_type) {
             case IOType::MEMORY_IO:
                 io_ = std::make_shared<MemoryIO>(dim * sizeof(T));
@@ -80,8 +81,7 @@ public:
         } else {
             nums_ = std::max(nums_, id + 1);
         }
-        const auto offset = id * dim_ * sizeof(T);
-        io_->write(vec, dim_ * sizeof(T), offset);
+        io_->write(vec, dim_ * sizeof(T), id);
     }
 
     void
@@ -91,7 +91,24 @@ public:
         }
 
         const int n = static_cast<int>(mat->size());
-        this->insert(reinterpret_cast<DataPtr>((*mat)[0].get()), n, ids);
+        if (ids == nullptr) {
+            logger << "Ids not provided, inserting vectors with continuous ids." << std::endl;
+            auto cnt = 0;
+            logger << "Current number of vectors: " << nums_ << std::endl;
+            logger << "Inserting " << n << " vectors." << std::endl;
+            {
+                std::lock_guard lock(rw_mutex_);
+                cnt = nums_;
+                nums_ += n;
+            }
+            for (IdType i = cnt, j = 0; i < cnt + n; ++i, ++j) {
+                io_->write(reinterpret_cast<DataPtr>((*mat)[j].get()), dim_ * sizeof(T), i);
+            }
+        } else {
+            for (IdType i = 0; i < n; ++i) {
+                this->insert(reinterpret_cast<DataPtr>((*mat)[i].get()), ids[i]);
+            }
+        }
     }
 
     void
@@ -102,12 +119,14 @@ public:
         if (ids == nullptr) {
             logger << "Ids not provided, inserting vectors with continuous ids." << std::endl;
             auto cnt = 0;
+            logger << "Current number of vectors: " << nums_ << std::endl;
+            logger << "Inserting " << n << " vectors." << std::endl;
             {
                 std::lock_guard lock(rw_mutex_);
                 cnt = nums_;
                 nums_ += n;
             }
-            io_->write(data, n * dim_ * sizeof(T), cnt * dim_ * sizeof(T));
+            io_->write(data, n * dim_ * sizeof(T), cnt);
         } else {
             for (IdType i = 0; i < n; ++i) {
                 this->insert(data + i * dim_ * sizeof(T), ids[i]);
@@ -135,10 +154,11 @@ public:
                 nums_ = std::max(nums_, offset + other->size());
             }
         }
-        // FIXME for file io, vectors may not be read continuously
-        io_->write(other->io_->read(dim_ * sizeof(T), 0),
-                   other->size() * dim_ * sizeof(T),
-                   cnt * dim_ * sizeof(T));
+        for (IdType i = 0; i < other->size(); ++i) {
+            io_->write(other->io_->read(dim_ * sizeof(T), i),
+                       dim_ * sizeof(T),
+                       cnt + i);
+        }
     }
 
     T*
@@ -146,7 +166,7 @@ public:
         if (idx >= nums_) {
             throw std::out_of_range("Index out of range in Vectors");
         }
-        const auto ptr = io_->read(dim_ * sizeof(T), idx * dim_ * sizeof(T));
+        const auto ptr = io_->read(dim_ * sizeof(T), idx);
         return reinterpret_cast<T*>(ptr);
     }
 
