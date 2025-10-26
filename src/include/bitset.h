@@ -56,6 +56,23 @@ public:
         return old & mask;
     }
 
+    /**
+     *
+     * @return position of the first zero bit, or size_ if all bits are set
+     */
+    [[nodiscard]] size_t
+    find_first_zero() const {
+        for (size_t i = 0; i < data_.size(); ++i) {
+            if (uint64_t block = data_[i]; ~block != 0) {
+                unsigned long offset = __builtin_ctzll(~block);
+                size_t pos = (i << 6) + offset;
+                if (pos < size_)
+                    return pos;
+            }
+        }
+        return size_;
+    }
+
     void
     clear();
 

@@ -151,11 +151,6 @@ MGraph::Refinement() {
     timer.end();
     logger << "Iterative update time: " << timer.elapsed() << "s" << std::endl;
 
-    // timer.start();
-    // connect_no_indegree(graph_[0]);
-    // timer.end();
-    // logger << "Connecting no indegree time: " << timer.elapsed() << "s" << std::endl;
-
     timer.start();
     prune(graph_[0]);
     timer.end();

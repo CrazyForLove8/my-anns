@@ -106,7 +106,7 @@ Neighborhood::pushHeap(IdType id, float dist) {
 void
 Neighborhood::addNeighbor(const Neighbor& nn, int capacity) {
     auto it = std::lower_bound(candidates_.begin(), candidates_.end(), nn);
-    if (nn.distance >= greatest_distance)
+    if (capacity > 0 && candidates_.size() >= capacity && nn.distance >= greatest_distance)
         return;
     if (it == candidates_.end() || it->id != nn.id) {
         candidates_.insert(it, nn);

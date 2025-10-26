@@ -43,7 +43,6 @@ test_multi_thread_parlay() {
 
 void
 testBuild() {
-    // TODO 还没跑
     auto dataset = Dataset::getInstance("gist", "1m");
     Log::redirect("vamana_incremental_" + dataset->getName());
     auto index = std::make_shared<diskann::Vamana>(getParam(dataset), 1.2, 200, 64);
@@ -58,7 +57,7 @@ int
 main() {
     Log::setVerbose(true);
 
-    testBuild();
+    test_multi_thread_parlay();
     int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
     if (ret != 0) {
         std::cerr << "Warning: System command failed with exit code " << ret << std::endl;

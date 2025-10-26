@@ -135,8 +135,7 @@ public:
     }
 
     void
-    insert(VectorsPtr<T> other,
-           const IdType offset = std::numeric_limits<IdType>::max()) {
+    insert(VectorsPtr<T> other, const IdType offset = std::numeric_limits<IdType>::max()) {
         if (other == nullptr || other->size() == 0) {
             return;
         }
@@ -155,9 +154,7 @@ public:
             }
         }
         for (IdType i = 0; i < other->size(); ++i) {
-            io_->write(other->io_->read(dim_ * sizeof(T), i),
-                       dim_ * sizeof(T),
-                       cnt + i);
+            io_->write(other->io_->read(dim_ * sizeof(T), i), dim_ * sizeof(T), cnt + i);
         }
     }
 
@@ -322,7 +319,7 @@ search_one_graph(const Vectors<float>* oracle,
         if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
-            auto expand = [&](const auto &candidate) {
+            auto expand = [&](const auto& candidate) {
                 auto id = candidate.id;
 #ifdef USE_SSE
                 _mm_prefetch(visit_array + id, _MM_HINT_T0);
@@ -343,9 +340,9 @@ search_one_graph(const Vectors<float>* oracle,
 
             if constexpr (!lock_free) {
                 std::lock_guard<std::mutex> guard(graph[n].lock_);
-                for (const auto &c: graph[n].candidates_) expand(c);
+                for (const auto& c : graph[n].candidates_) expand(c);
             } else {
-                for (const auto &c: graph[n].candidates_) expand(c);
+                for (const auto& c : graph[n].candidates_) expand(c);
             }
         }
         if (nk <= k)
@@ -360,37 +357,37 @@ search_one_graph(const Vectors<float>* oracle,
     return retset;
 }
 
-    template<bool lock_free = false>
-    inline Neighbors
-    search_one_graph_with_seed(const Vectors<float> *oracle,
-                               VisitedListPool *visited_list_pool,
-                               Graph &graph,
-                               const float *query,
-                               int topk,
-                               int L,
-                               std::vector<IdType> seed_ids) {
-        auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
-        auto visit_list = visit_pool_ptr.get();
-        auto *visit_array = visit_list->block_;
-        auto visit_tag = visit_list->version_;
+template <bool lock_free = false>
+inline Neighbors
+search_one_graph_with_seed(const Vectors<float>* oracle,
+                           VisitedListPool* visited_list_pool,
+                           Graph& graph,
+                           const float* query,
+                           int topk,
+                           int L,
+                           std::vector<IdType> seed_ids) {
+    auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
+    auto visit_list = visit_pool_ptr.get();
+    auto* visit_array = visit_list->block_;
+    auto visit_tag = visit_list->version_;
 
-        Neighbors retset(
-                L + 1,
-                Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
-        for (int i = 0; i < std::min((int) seed_ids.size(), L); i++) {
-            if (seed_ids[i] == std::numeric_limits<IdType>::max()) {
-                continue;
-            }
-            IdType id = seed_ids[i];
-            float dist = (*oracle)(id, query);
-            retset[i] = Neighbor(id, dist, true);
+    Neighbors retset(
+        L + 1,
+        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
+    for (int i = 0; i < std::min((int)seed_ids.size(), L); i++) {
+        if (seed_ids[i] == std::numeric_limits<IdType>::max()) {
+            continue;
         }
-        std::sort(retset.begin(), retset.begin() + std::min((int) seed_ids.size(), L));
+        IdType id = seed_ids[i];
+        float dist = (*oracle)(id, query);
+        retset[i] = Neighbor(id, dist, true);
+    }
+    std::sort(retset.begin(), retset.begin() + std::min((int)seed_ids.size(), L));
 
-        int k = 0;
-        while (k < L) {
-            int nk = L;
-            if (retset[k].flag) {
+    int k = 0;
+    while (k < L) {
+        int nk = L;
+        if (retset[k].flag) {
             retset[k].flag = false;
             auto n = retset[k].id;
             auto expand = [&](const auto& candidate) {
@@ -490,23 +487,23 @@ search_hgraph_layer(const Vectors<float>* oracle,
 }
 
 inline Neighbors
-search_hgraph_layer_with_seed(const Vectors<float> *oracle,
-                              VisitedListPool *visited_list_pool,
-                              HGraph &hgraph,
+search_hgraph_layer_with_seed(const Vectors<float>* oracle,
+                              VisitedListPool* visited_list_pool,
+                              HGraph& hgraph,
                               int layer,
-                              const float *query,
+                              const float* query,
                               int topk,
                               int L,
                               std::vector<IdType> seed_ids) {
     auto visit_pool_ptr = visited_list_pool->getFreeVisitedList();
     auto visit_list = visit_pool_ptr.get();
-    auto *visit_array = visit_list->block_;
+    auto* visit_array = visit_list->block_;
     auto visit_tag = visit_list->version_;
-    auto &graph = hgraph[layer];
+    auto& graph = hgraph[layer];
     Neighbors retset(
-            L + 1,
-            Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
-    for (int i = 0; i < std::min((int) seed_ids.size(), L); i++) {
+        L + 1,
+        Neighbor(std::numeric_limits<IdType>::max(), std::numeric_limits<float>::max(), false));
+    for (int i = 0; i < std::min((int)seed_ids.size(), L); i++) {
         if (seed_ids[i] == std::numeric_limits<IdType>::max()) {
             continue;
         }
@@ -514,7 +511,7 @@ search_hgraph_layer_with_seed(const Vectors<float> *oracle,
         float dist = (*oracle)(id, query);
         retset[i] = Neighbor(id, dist, true);
     }
-    std::sort(retset.begin(), retset.begin() + std::min((int) seed_ids.size(), L));
+    std::sort(retset.begin(), retset.begin() + std::min((int)seed_ids.size(), L));
 
     int k = 0;
     while (k < L) {
@@ -523,7 +520,7 @@ search_hgraph_layer_with_seed(const Vectors<float> *oracle,
             retset[k].flag = false;
             auto n = retset[k].id;
             std::lock_guard<std::mutex> lock(hgraph[0][n].lock_);
-            for (const auto &candidate: graph[n].candidates_) {
+            for (const auto& candidate : graph[n].candidates_) {
                 auto id = candidate.id;
 #ifdef USE_SSE
                 _mm_prefetch(visit_array + id, _MM_HINT_T0);

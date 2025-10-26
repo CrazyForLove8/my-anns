@@ -204,7 +204,7 @@ hnsw::HNSW::partial_build(IdType start, IdType end) {
                 logger << "Saved index at point " << i << std::endl;
             }
 
-            if (i % 100000 == 0) {
+            if (i % (oracle_->size() / 10) == 0) {
                 logger << "Adding " << i << " / " << end << std::endl;
             }
             addPoint(i);

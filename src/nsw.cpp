@@ -34,6 +34,11 @@ nsw::NSW::addPoint(unsigned int index) {
                                 ef_construction_,
                                 std::numeric_limits<IdType>::max(),
                                 index);
+    res.erase(
+        std::remove_if(res.begin(),
+                       res.end(),
+                       [index](const Neighbor& n) { return n.id == index; }),
+        res.end());
     for (auto& re : res) {
         graph_[index].addNeighbor(re, max_neighbors_);
         {
@@ -105,23 +110,18 @@ nsw::NSW::build_internal(DatasetPtr& dataset) {
 
 void
 nsw::NSW::add(DatasetPtr& dataset) {
-    if (!built_) {
-        throw std::runtime_error("Index is not built yet");
-    }
-    built_ = false;
-
     auto cur_size = oracle_->size();
-    auto total = dataset->getOracle()->size() + cur_size;
-    this->resize(total);
+
     oracle_->insert(dataset->getBasePtr());
+    this->resize(oracle_->size());
     print_info();
 
     Timer timer;
     timer.start();
 #pragma omp parallel for schedule(dynamic)
-    for (int i = cur_size; i < total; ++i) {
+    for (auto i = cur_size; i < oracle_->size(); ++i) {
         if (i % 10000 == 0) {
-            logger << "Adding " << i << " / " << total << std::endl;
+            logger << "Adding " << i << " / " << oracle_->size() << std::endl;
         }
         addPoint(i);
     }
@@ -132,6 +132,7 @@ nsw::NSW::add(DatasetPtr& dataset) {
     flatten_graph_ = FlattenGraph(graph_);
     built_ = true;
 }
+
 void
 nsw::NSW::print_info() const {
     Index::print_info();
