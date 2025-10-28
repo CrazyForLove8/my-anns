@@ -19,6 +19,13 @@ SET(CMAKE_CXX_FLAGS "-std=c++17 -DNDEBUG -fpic -DHAVE_CXX0X -fopenmp -ftree-vect
 #    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 #endif ()
 
+#option(ENABLE_THREAD_SANITIZER "Enable ThreadSanitizer for data race and deadlock detection" ON)
+#
+#if (ENABLE_THREAD_SANITIZER)
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer -g -O1")
+#    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
+#endif ()
+
 include_directories(src)
 
 add_subdirectory(src)

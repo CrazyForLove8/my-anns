@@ -10,6 +10,7 @@
 #include <random>
 
 #include "index.h"
+#include "bitset.h"
 #include "nndescent.h"
 
 using namespace graph;
@@ -59,7 +60,7 @@ public:
         this->m_ = m;
     }
 
-    Neighbors
+    void
     prune(std::vector<Neighbor>& candidates);
 
     void
