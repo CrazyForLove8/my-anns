@@ -91,14 +91,47 @@ test_merge(){
     recall(merge, dataset, 200);
 }
 
+void
+testMergeNSG() {
+    auto ds = {"glove", "gist", "crawl"};
+    for (auto d : ds) {
+        auto dataset = Dataset::getInstance(d, "1m");
+        Log::redirect("mgraph_nsg_" + dataset->getName());
+        auto datasets = dataset->subsets(2);
+
+        std::vector<int> ks;
+        if (dataset->getName() == "deep" || dataset->getName() == "msong" || dataset->getName() == "sift") {
+            ks = {8, 12, 16, 20, 24, 28, 32};
+        } else {
+            ks = {8, 16, 24, 32, 40, 48, 56};
+        }
+
+        for (auto k :ks) {
+            omp_set_num_threads(16);
+            auto index1 = std::make_shared<nsg::NSG>(datasets[0], k * 2, 200, k * 2);
+            index1->build();
+
+            auto index2 = std::make_shared<nsg::NSG>(datasets[1], k * 2, 200, k * 2);
+            index2->build();
+
+            std::vector<IndexPtr> indexes = {index1, index2};
+            auto mgraph = std::make_shared<MGraph>(dataset, k, 200);
+            omp_set_num_threads(1);
+            mgraph->combine(indexes);
+            recall(mgraph, dataset, 200);
+        }
+    }
+}
+
+
 int
 main() {
     Log::setVerbose(true);
 
-    test_merge();
-    int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
-    if (ret != 0) {
-        std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
-    }
+    testMergeNSG();
+    // int ret = std::system("mpv /mnt/c/Windows/Media/Alarm01.wav");
+    // if (ret != 0) {
+    //     std::cerr << "Warning: System command failed with exit code " << ret << std::endl;
+    // }
     return 0;
 }
